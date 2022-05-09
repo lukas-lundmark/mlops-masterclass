@@ -22,7 +22,8 @@ In the launcher for Azure ML workspace in the Azure Portal (not the Studio), dow
 In your notebook, import the Azure Machine Learning package. If you initialized the environment from the conda file it should already be installed. You can import all the classes we will use right away
 
 #+begin_src python
-from azureml.core import Workspace, Experiment, Dataset, Datastore, Run
+from azureml.core import Workspace, Experiment, Dataset, Datastore, Run, Model
+from azureml.exceptions import UserErrorExcepion
 #+end_src
 
 Access your workspace from the config by instantiating a workspace object.
@@ -160,7 +161,7 @@ all_models = Model.list(ws, name="my-regressor")
 
 Then, you can inspect the tags of these models for the metrics and register the model if it's better, e.g.,
 #+begin_src python
-if all(new_r2 < r2 for model.tags.get("r2", np.inf) in all_models):
+if all(r2 >  float(model.tags.get("r2", -np.inf)) for model in all_models):
     run.register_model(..., tags={"r2": new_r2, ...})
 #+end_src
 
@@ -191,7 +192,7 @@ Commit this code, because we are now gonna start breaking things. Create a secon
 Create a script in *ml_pipelines* called *run_train_script.py*. For now, this script only needs to define a python run step and the environment it should run in. To make debugging easier we start by running it locally. Use the Azure ML SDK, and create an environment from our conda definition file
 
 #+begin_src python
-from azureml.core import Environment, Workspace
+from azureml.core import Environment, Workspace, Experiment
 ws = Workspace.from_config()
 experiment = Experiment(ws, "my-script-experiment")
 environment = Environment.from_conda_specification(
@@ -202,7 +203,8 @@ environment.register(ws)
 
 Then, create a ScriptConfig that references your training script
 #+begin_src python
-src = ScriptRunConfig('src', script='train.py', environment=local_env)
+from azureml.core import ScriptRunConfig
+src = ScriptRunConfig('src', script='train.py', environment=environment)
 run = experiment.submit(src)
 run.wait_for_completion(show_output=True)
 #+end_src
@@ -237,6 +239,9 @@ this should now start a new run in a Docker environment on your local machine. I
 
 Now, we should look into how to allocate remote compute in Azure ML. A cpu cluster is often enough for simple training scripts
 #+begin_src python
+from azureml.core.compute import ComputeTarget, AmlCompute
+from azureml.core.compute_target import ComputeTargetException
+
 try:
     cpu_cluster = ComputeTarget(workspace=ws, name=cpu_cluster_name)
 except ComputeTargetException:
