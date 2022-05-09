@@ -1,7 +1,6 @@
-#+title: Instructions for Azure ML Day 1
-#+author: luklun
+#+title: Instructions for MLOps Workshop Day 1
 
-* Instructions for Day 1
+* Preparations
 
 ** What is MLOps
 Before you start you might want to read a small introduction of [[./mlops.org][MLOps.]]
@@ -45,13 +44,10 @@ We will make heavy use of the command line. Most commands in the examples should
 
 * Day 1 Instructions
 ** Day1 Part 1 - Getting Started with Azure ML
-We start by setting up an experiment locally using [[./azureml-day-1.org][Azure ML]] to train Azure ML.
-You find the instructions [[./azureml-day-1.org][here]].
+We start by setting up an experiment locally using [[./azureml-info.org][Azure ML]] to train our model. You find the instructions [[./azureml-day-1.org][here]].
 
 ** Day1 Part 2 - Integrate Azure ML with GitHub
-We will then automate our training process by integrating it with GitHub Actions.
-You find the instructions [[./github-day-1.org][here]].
-
+We will then automate our training process by integrating it with GitHub Actions. You find the instructions [[./github-day-1.org][here]].
 
 * Relevant Litterature
-Practical MLOps
+- Practical MLOps
