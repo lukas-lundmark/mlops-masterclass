@@ -17,7 +17,7 @@ The easiest way to install all the dependencies on an M1 machine is to use conda
 You can set the architecture of a conda environment by setting CONDA_SUBDIR before creation. If we want OSX x86 we simply specify
 
 #+begin_src bash
-CONDA_SUBDIR=osx-64 conda env create -f ci_dependencies.yml
+CONDA_SUBDIR=osx-64 conda env create -f environment_setup/ci_dependencies.yml
 #+end_src
 
 * Using Pyenv and Rosetta

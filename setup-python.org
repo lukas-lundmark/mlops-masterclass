@@ -6,10 +6,10 @@ My recommendation is to install [[https://docs.conda.io/en/latest/miniconda.html
 
 Create a new repository for the MLOps workshop. Copy the folder environment_setup from the workshop example repository and place it in your new directory.
 
-Create the environment and then activate it
+Create the environment usin conda (or mamba) and activate it for the current environment
 #+begin_src bash
-conda / mamba env create -f /environment_setup/ci_dependencies.yaml
-conda activate mlops_python
+conda env create -f environment_setup/ci_dependencies.yaml
+conda activate mlopspython_ci
 #+end_src
 
 
