@@ -1,0 +1,59 @@
+#+title: Docker
+#+author: luklun
+
+* Docker
+We will use Docker in every step of this Master Class. We will build Containers to run both locally for debugging as well as running in our CI/CD pipelines. Similarly, Azure ML will use docker to run its experiments locally in containerized environments.
+
+Docker is easy to install on most platforms (my Windows experience is limited).
+https://docs.docker.com/get-docker/
+
+
+* Docker Basics
+
+** Docker Container
+A virtualized runtime with its own filesystem and operating system. Containers are very popular in cloud computing, and software development in general since they make deployment much easier.  It also makes any form of remote code execution more convenient, since we can specify the exact environment the code should run in.
+
+** Docker Image
+An immutable template, or snapshot, of a virtualized environment from which containers can be instantiated.
+
+Docker Images are created from Dockerfiles, which are a set of instructions that defines the state of the Image. New images are often created from preexisting images, such as ubuntu:18.04 with some additional dependencies installed.
+
+Example
+
+#+begin_src docker
+# Base Image
+FROM python:3.10-debian
+# Copy requirementx file
+COPY requirements.txt /setup/
+# Install dependencies
+RUN pip install -r /setup/requirements.txt
+# Set a default run command
+CMD ["python", "-c", "print('HELLO WORLD')"]
+#+end_src
+
+** Docker Compose
+Docker Compose is a utility tool (now a part of the docker CLI) that enables us to start multiple containers at the same time. This is useful when one wants to run one container with a database environment, one container with a server environment, etc. Docker Compose uses YAML files to configure how each container should be started, what command it should run, what folders it should mount, etc.
+
+** Docker Tags
+When an image is built it per default receives an immutable unique hash that functions as its identifier. Tags are mutable references to the image that contains information regarding where the image should be hosted, what the image contains, and what version of the image this is.
+
+Tags are mutable references and can be added at any time. Tags generally has the following format
+#+begin_src bash
+docker tag {local-image-id} {registry-location}/{namespace}/{imagename}:{version-number}
+#+end_src
+
+For example
+#+begin_src bash
+docker tag 0e5574283393 myregistryhost:5000/fedora/httpd:version1.0
+#+end_src
+
+The registry information becomes important when we want to store the images remotely later.
+
+** Container Registries
+A container registry is a repository where images are stored. Most big platforms now offer their own container registry service, such as Azure Container Registry, GitHub Container Registry (GHCR), etc. Storing images in a registry allows others to use your images, but also allows you to use your images in different remote services like GitHub actions.
+
+If you specify registry information in the tag you can just push the image to the registry by referencing the
+#+begin_src bash
+docker login <your-registry>
+docker push myregistryhost:5000/fedora/httpd:version1.0
+#+end_src

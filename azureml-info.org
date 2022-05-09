@@ -1,0 +1,48 @@
+#+title: Azureml Info
+#+author: luklun
+
+* Azure Machine Learning
+In this workshop, we will use Azure ML for all things ML-related. Azure Machine Learning is Microsoft's so-called ML-as-a-Service (MLaaS) offering. Azure ML is a good choice for building MLOps solutions because it supports (more or less) all steps of the model life-cycle. It has excellent tooling for helping data scientists to track their experiments, while also offering the ML Engineer a simple interface to manage deployments and computing.
+
+Azure ML has three main ways of interaction: the Studio (Web GUI), the CLI, and the Python SDK. We will use the studio to monitor our resources and deployments and *not* to train models, build pipelines, or deploy models, although it is entirely possible to do so. We will instead use the CLI and the python SDK to define most resources since these lend themselves better to being automated.
+
+More specifically, we will use Azure ML to do the following
+
+1. Use Azure ML Dataset for storing and versioning datasets
+2. Use Azure ML Model Registry for storing our models
+3. Use Azure ML Environments to define the containers that our training will run on
+4. Use Azure ML Online Endpoints to deploy our models
+5. Azure Application insight to monitor the model's performance
+
+
+** Key Concepts
+If you are unfamiliar with Azure ML there are a few key concepts that are good to be familiar with. (If you are interested you can watch a small introduction presentation on Azure ML here that will present all of these concepts with some examples.)
+
+*** Workspace
+Workspaces is the top-level resource in Azure ML. The workspace is essentially an identifier, or a namespace, to keep track of your underlying resources. Every other resource belongs to a single workspace, and when you want to access a resource you often need to provide a reference to the workspace it belongs to.
+
+*** Dataset
+Datasets consist of references to data in Azure Datastores, some loading information, as well as versioning information. References can be explicit paths or dynamic glob patterns. It is essential, in order to guarantee reproducibility, that you don't modify the underlying data, since
+
+There are two types of datasets. File datasets and tabular datasets. File datasets only consist of file references, while tabular datasets also contain some additional schema information, that allows you to create filters and other modifications to existing datasets.
+
+You can upload data frames as datasets, in which Azure ML will save the data frame as a Parque file in the default datastore and create references and load information
+
+These datasets don't have any knowledge about the data they reference and only materialize the data when someone asks for it. This means that if the underlying data changes, our experiments are no longer reproducible. This means that one has to show restraint in how one manages the underlying datastore to guarantee that the data doesn't change.
+
+*** Experiments
+Experiments are simply namespaces of related trials. What is considered a related trial is up to the individual Data Scientist or the Data Science Team. I usually use the principle that if it no longer makes sense to compare the results between two different trials, due to changes in the datasets or changes in the code, then it is time to create a new experiment. I also create separate experiments for when I debug some experiment code, so as not to pollute the real experiment result.
+
+*** Runs
+A *Run* is a single run of a trial, with a trial usually consisting of the training and evaluation of a single machine learning model. Run instances provide automatic support for experiment tracking, backing up code, and git information. Essentially, the run instances are the interface through which we store metrics, models, and other run artifacts
+
+There are different types of runs depending on how they are initialized. Interactive runs are used in scripts and notebooks that you run by yourself, usually on your local computer.
+
+*** Pipelines
+Pipelines are a way of orchestrating multiple python scripts. If you have multiple steps in your training and validation procedure, such as data preparation and model selection, it can be a good idea to extract these as separate scripts. You can then orchestrate these as Azure ML pipelines, where each script can run on its own specialized compute. Pipelines are also useful because they can exist as a definition in Azure ML, which can then be triggered as an endpoint. This means that we can start retraining without having to publish a new version of the training script.
+
+*** Environments
+Environments are Azure ML ways of specifying the run time environment for submitted scripts and pipelines. Environments are easily configured by specifying pip or conda packages and python versions. If you have specific requirements you can also build environments from your customer docker images.
+
+*** AML Compute
+Compute resources managed by Azure ML that can be used for both Training and Deployment.

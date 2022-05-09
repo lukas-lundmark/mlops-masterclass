@@ -1,0 +1,20 @@
+#+title: Github Info
+#+author: luklun
+
+* GitHub and GitHub Actions
+
+* Key Concepts
+** Workflows
+Workflow is the GitHub Actions term for CI Pipelines or DevOps pipelines. A Workflow consists of a set of independent jobs that are executed in parallel if you don't specify a dependency between them. The workflow is defined using a YAML file in the .github/workflows directory in your git repo. Workflows are automatically instantiated if a valid workflow file is present in your repo.
+
+** Jobs
+Each workflow consists of a set of Jobs (that may or may not be dependent on each other). Each job consists of a set of steps that are executed in sequential order in a shared runtime environment.
+
+** Step
+A step can either be a predefined action or a set of bash/powershell command. Usually, if a step fails the entire job will fail.
+
+** Action
+Reusable applications (or collection of other Actions) that can run in the CI environment and can take input and produce outputs. Actions can vary from a simple bash command to complex python applications. You may create your own Actions or you can use predefined actions from GitHub or third-party providers.
+
+* Reference
+https://resources.github.com/whitepapers/github-actions-cheat/

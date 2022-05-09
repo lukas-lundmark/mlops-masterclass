@@ -1,0 +1,73 @@
+#+title:
+#+author: luklun
+
+* Preparing Python
+My recommendation is to install [[https://docs.conda.io/en/latest/miniconda.html][Conda]] (or [[https://mamba.readthedocs.io/en/latest/installation.html][Mamba]]) to manage your environment, but you can use whatever environment manager you feel comfortable with. (M1 users can read [[./m1.org][here]] for instructions on how to set up their environment locally).
+
+Create a new repository for the MLOps workshop. Copy the folder environment_setup from the workshop example repository and place it in your new directory.
+
+Create the environment and then activate it
+#+begin_src bash
+conda / mamba env create -f /environment_setup/ci_dependencies.yaml
+conda activate mlops_python
+#+end_src
+
+
+* Notes on Python Environments
+When we talk about defining environments for our models, we by 95% mean downloading the correct python packages. However, there are many ways one can download python packages. In this section, we will deep dive into python packages and how to best define environments
+
+** Pip
+Pip is python's default package installer. This will install packages to whichever python environment you are currently in. There aren't really any rules for how one specifies python versions using pip. Generally, one uses a requirements.txt file with lines in the format
+
+#+begin_src
+tensorflow==2.1.0
+scikit-learn==1.0.*
+#+end_src
+
+whichi you then install using
+#+begin_src bash
+pip install -r requirements.txt
+#+end_src
+
+Pip is generally a good tool. Conflict resolution, i.e., pip determining which package version can be installed together without conflict, is moderately fast. A lot of packages have pre-compiled wheels for most platforms which makes installation faster, see the next section on distribution and build wheels.
+
+*** Source Distributions and Wheels.
+In python, packages can be distributed as either source distribution or wheels. Source distributions are essentially tar-file containing the source code and a setup.py file that perform the necessary preparations for the package to work, e.g., compiling dependencies. The disadvantages to this approach are many. Download sizes are bigger, installations take longer time and are much more brittle, and can sometimes fail if you miss (often) unmentioned dependencies such as a C compiler.
+
+Wheels, on the other hand, are essentially zip files, containing the compiled binaries required to run the project without any extra steps which make installation faster. Wheels are also generally smaller in size, which makes downloading the packages faster as well. The downside is that a package needs to have a precompiled wheel for your platform for you to take advantage of this.
+
+This is often not something one has to think about unless one uses some weird hardware or obscure OS. Pip, by default, tries to prefer wheels over source distributions. Furthermore, you can explicitly tell pip to only use binaries by using the --binaries-only flag during installation. However, one area where this sometimes becomes relevant is when building docker images. Doing a pip installation on certain docker images, based on Linux distributions such as Alpine Linux, can sometimes take 50 times longer to install.
+
+
+** Conda and Mamba
+Conda is a command-line tool for installing and managing python environments. Conda is convenient because you can define everything from the python version to what packages you need. You can also specify from which channels you should look for packages. Conda repositories also contain a lot of prebuilt binaries for several platforms, especially in community repositories such as conda-forge. These prebuilt wheels can make it much easier for users with M1 chips to download packages. Conda is also convenient because you can install an internal version of pip inside of your conda environment and download pip packages as well, meaning that you can specify your environment more or less completely.
+
+Environments are defined as yaml-files in the following format:
+#+begin_src yaml
+name: my-env
+channels:
+  - conda-forge
+
+dependencies:
+  # Python version for this environment
+  - python=3.10.*
+  - numpy=1.22.*
+
+  # Pip version to download pip packages with
+  - pip=22.0.*
+
+  # Pip dependencies not available in conda repos
+  - pip:
+      - azureml-sdk==1.40.*
+#+end_src
+
+Assuming you have installed conda on your system, you can create and activate the environment using
+#+begin_src bash
+conda env create -f env-file.yaml
+# The name in the env-file
+conda activate my-env
+#+end_src
+
+The downside to Conda is that the conflict resolution is (sometimes) excruciatingly slow. Conflict resolution it can take tens of minutes, in worst case hours, to resolve package conflicts. Furthermore, conda doesn't have parallel downloads so the installation process itself can also be slow. Similarly, conda doesn't solve the problem we mentioned before of managing external dependencies for python packages.
+
+There are some (close-to) drop-in replacements to conda, such as Mamba and Micromamba. These tools contain essentially the same instruction set as conda and the same repositories., Micromamba is easy to install, is up to 10 times faster at resolving conflicts, and multiple times faster at installing packages due to the ability to download packages in parallel.

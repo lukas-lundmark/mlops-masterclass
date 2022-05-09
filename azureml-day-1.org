@@ -1,0 +1,294 @@
+#+title: Azure ML Day 1
+#+author: luklun
+
+* Getting Started
+If you haven't already done so, create a new, empty GitHub code repository with a fun name. This repository will be our own MLOps respiratory. Although we will reuse some code from the main workshop MLOps repo we start with an empty git repository. This is so we are all fully aware of what each piece of code does in our repo.
+
+Create a local folder for your code with the same name as your new repo and initialize the repo locally. Add a nice README and commit and push it to your repository. Then, checkout the main workshop MLOps repository to a separate folder (we will copy some code from here later)
+
+If you haven't already, set up your [[./setup-python.org][Python Environment]] and then the [[./setup-azure.org][Azure CLI]].
+
+* Interactive Experiment Tracking
+We are gonna start with getting familiar with Azure ML and how it can be used to track our interactive notebook experiments. In a normal DS project, this experiment phase will take up the majority of the start of the project. In this workshop, however, we will go through it quite quickly.
+
+** Starting a Jupyter Notebook
+Before you start the notebook it can be a good idea to login to your [[./setup-azure.org][Azure CLI]]. Also, make sure you have activated your python environment. Then run
+
+Start a Jupyter Notebook Server from the root of your directory. Create a new directory called notebooks or experiments and create a new notebook there with some insightful names.
+
+** Access your workspace
+In the launcher for Azure ML workspace in the Azure Portal (not the Studio), download the workspace config file and add it to the root folder. Create a .gitignore file and add config.json to it so you don't accidentally push that file to your repo. This configuration file identifies your Azure ML workspace and if you are in an environment with access to that workspace, i.e., you are logged in via your Azure CLI, you have access to all of the workspace's resources.
+
+In your notebook, import the Azure Machine Learning package. If you initialized the environment from the conda file it should already be installed. You can import all the classes we will use right away
+
+#+begin_src python
+from azureml.core import Workspace, Experiment, Dataset, Datastore, Run
+#+end_src
+
+Access your workspace from the config by instantiating a workspace object.
+
+#+begin_src python
+ws = Workspace.from_config()
+#+end_src
+
+If you haven't logged in from your Azure CLI, you will be prompted to do so in your notebook.
+
+** Register a dataset
+One of the most basic utilities AML offers is the ability to store and version your datasets. Import your data as a pandas data frame. Clean it if you like. Then, we want to register the dataset
+
+#+begin_src python
+import pandas as pd
+df = pd.from_csv(...)
+#+end_src
+
+You can register and upload a dataset the following way
+#+begin_src python
+datastore = Datastore.get_default(ws)
+dataset = Dataset.Tabular.register_pandas_dataframe(
+    df,
+    datastore,
+    show_progress=True,
+    name='my-dataset',
+    description='This is some dataset'
+)
+#+end_src
+
+However, it's a good idea to try to check if the dataset already exists, and download it if exists. Otherwise, you will keep adding a new version of the dataset every time your rerun your notebook.
+
+#+begin_src python
+try:
+    dataset = Dataset.get_by_name(ws, name="my-dataset")
+except UserErrorException as ue:
+    datastore = Datastore.get_default(ws)
+    dataset = Dataset.Tabular.register_pandas_dataframe(
+        #...
+#+end_src
+
+You can then convert the dataset to a dataframe like this:
+#+begin_src python
+df = dataset.to_pandas_dataframe()
+#+end_src
+
+Tips: It can be a good idea to create two different datasets, one for training and one for testing. Or add a column to which split the data belongs. Or you can use cross-validation for evaluation.
+
+After this, you should be able to restart your notebook completely and have the data downloaded from Azure ML. This enables anyone else who has access to your workspace and has your config file to run your notebooks, without having to share the data or having to add the data to the code repository.
+
+** Run Interactive Experiments with Experiment Tracking
+Since we have a lot of things to do, we will not spend a lot of effort in trying to get our model to be the best in the world. The focus is on the work around it, how we manage the model and how we build the architecture to facilitate the management of it.
+
+Write some basic training code for training and evaluating your machine learning model.
+
+Some tips:
+    - Use a suitable train-test split with a fixed seed for reproducibility.
+    - Print out some suitable test metrics, e.g., r2.
+    - Use the joblib package to save the resulting model.
+
+Test that the code runs and that you get a working model. A simple Linear Model should work.
+
+Tips: If you want some inspiration or are unsure how to run your experiments, you can look in the notebook on the MLOps project repository.
+
+Now, define an experiment and use it to start a interactive run before your experiment starts.
+#+begin_src python
+exp = Experiment(ws, 'workshop-experiment')
+run = experiment.start_logging(snapshot_dir='.')
+#+end_src
+
+Run your sklearn experiment code and train a model
+
+Change the code to also log the metric using the run.log to log some metric
+#+begin_src python
+run.log('r2', r2_value)
+run.log('rmse', rmse_value)
+#+end_src
+
+Finish the interactive run with
+#+begin_src python
+run.complete()
+#+end_src
+
+Check on your workspace that the experiment was created and that the run was created and completed, and that the results of your run were logged. If it's marked as running it means you forgot to run the run.complete() statement. But you can manually complete the run from within the Studio as well.
+
+Check the log and outputs of the run. You can see that each run has a local copy of your source directory. This is what you specified with the snapshot_dir parameter. This is a good way for others to see what code was used to generate a run. Similarly, the run also contains information regarding your git repository, showing which commit was used to run the experiment and if the branch was dirty when the code ran.
+
+Try to tweak your training script a little and run it again. Inspect your run history for your experiment in your workspace to see how the new run was added. Tweak the layout if you want to customize how you visualize the changes in history.
+
+** Register a model in the Model Registry and log metrics
+Don't waste too much time on improving your model. It is not the point of this workshop. Set up some training code that we can.
+
+Registering a model is straightforward. We just need to save the model locally in a format we can load later, joblib is usually the standard for scikit-learn models. Joblib is a modified version of python's standard serializing library pickle which is better optimized for binary data
+#+begin_src python
+from pathlib import Path
+import joblib
+
+path = Path("output", "model.pkl")
+path.parent.mkdir(exist_ok=True)
+joblib.dump(model, filename=str(path))
+#+end_src
+
+Then, we need to upload the model to somewhere Azure ML can access it. We can use the run for this. Uploading a file to the run will result in it being available in the run history and its logs
+
+#+begin_src python
+run.upload_file(str(path.name), path_to_stream=str(path))
+#+end_src
+
+Then, you can register the model to your workspace.
+#+begin_src python
+run.register_model(model_name="my-regressor", model_path=str(path.name), description="blah blah")
+#+end_src
+
+However, it is good practice to add as much meta information as possible to the model. Since we register the model to the run, there will always be a link to the run and the model, and you can always get access to the log information of the run via the model. However, to make things easier when inspecting our model registry, we want to add things like datasets used for training and testing, metrics, which framework the model used, etc.
+
+#+begin_src python
+run.register_model(
+    model_name="my-regresssor",
+    model_path=str(path.name),
+    description="Very good regression model",
+    model_framework="ScikitLearn",
+    datasets=[("training dataset", train_dataset), ("test dataset", test_dataset)],
+    tags={"rmse": rmse, "r2": r2}
+)
+#+end_src
+
+The final thing we want is to make sure that we only register models that improve on earlier results. It is still okay to upload the model to the run, but it's a bad idea to clutter your registry with subpar models.
+
+By registering the metrics in the model tags, as we did, we make makes things easier for us.
+
+You can get all models with the same name by using
+#+begin_src python
+all_models = Model.list(ws, name="my-regressor")
+#+end_src
+
+Then, you can inspect the tags of these models for the metrics and register the model if it's better, e.g.,
+#+begin_src python
+if all(new_r2 < r2 for model.tags.get("r2", np.inf) in all_models):
+    run.register_model(..., tags={"r2": new_r2, ...})
+#+end_src
+
+Or, if you start using a new model name, you can enforce this rule of only registering the best model from the beginning. Then, you know that the latest model registered is always the best, and only needs to compare to that. You can then get the latest model and compare it with your current result
+
+#+begin_src python
+try:
+    latest_model = Model(ws, name="my-regressor")
+    r2 = latest_model.tags.get("r2", np.inf)
+except WebserviceException as e:
+    ...
+#+end_src
+
+Note: Tags are a convenient way of storing information about the model, although it is a bit hacky. For example, in later sections, we will use the tags to store information about which code commit created the model, and which CI/CD run that trained the model.
+
+Tips: When extending functionality like this for my ML experiments. I always change the name of the experiment, and model and manually set metrics to see how better or worse metrics affect training. That way, I can assure that things work properly, without polluting the namespace of the experiment or the model.
+
+* Converting your Notebook into a training script
+Notebooks are perfect for rapid development, but they can be difficult to collaborate on, and hard to automate, making them ill-suited for MLOps. After having become familiar with the Azure ML basic, we are gonna convert our notebook to a simple training script that we will run both locally, and remotely.
+
+Create a directory called "src" in your repository. Create a single file called train.py there. Extract the necessary code from your notebook into the train.py file. It should connect to your Azure ML workspace, and download the necessary dataset, as you did before. Run the training as before
+
+Make sure that you can run the script as src_bash{python src/train.py}
+and that it runs until completion, just like in your notebook.
+
+Commit this code, because we are now gonna start breaking things. Create a second folder called *ml_pipelines* in the project root. This folder will contain orchestration code for our training scripts. "Orchestration" code in Azure ML is SDK code that manages the execution of our experiments. It defines the environment for the scripts to run in, provisions compute for the experiments, and can also manage how models are deployed.
+
+Create a script in *ml_pipelines* called *run_train_script.py*. For now, this script only needs to define a python run step and the environment it should run in. To make debugging easier we start by running it locally. Use the Azure ML SDK, and create an environment from our conda definition file
+
+#+begin_src python
+from azureml.core import Environment, Workspace
+ws = Workspace.from_config()
+experiment = Experiment(ws, "my-script-experiment")
+environment = Environment.from_conda_specification(
+    name="my-environment", file_path="environment_setup/ci_dependencies.yml"
+)
+environment.register(ws)
+#+end_src
+
+Then, create a ScriptConfig that references your training script
+#+begin_src python
+src = ScriptRunConfig('src', script='train.py', environment=local_env)
+run = experiment.submit(src)
+run.wait_for_completion(show_output=True)
+#+end_src
+
+Now before we run this experiment, you need to modify *train.py* script with two simple changes.
+*Replace* the creation of the workspace, experiment, and the run in your script
+#+begin_src python
+ws = Workspace.from_config()
+experiment = Experiment(ws, "some-experiment-name")
+# ...
+run = experiment.start_logging()
+#...
+run.complete()
+#+end_src
+
+with this
+
+#+begin_src python
+from azureml.core import Run
+# ...
+run = Run.get_context()
+experiment = run.experiment
+workspace = run.experiment.workspace
+#+end_src
+This change is required because now the orchestration code is responsible for instantiating the experiment and the run, and the script can get those objects from the Run context.
+
+Execute the new orchestration code
+#+begin_src bash
+python -m ml_pipelines.run_train_script.py
+#+end_src
+this should now start a new run in a Docker environment on your local machine. If you go to the Studio you should still see a new run having started
+
+Now, we should look into how to allocate remote compute in Azure ML. A cpu cluster is often enough for simple training scripts
+#+begin_src python
+try:
+    cpu_cluster = ComputeTarget(workspace=ws, name=cpu_cluster_name)
+except ComputeTargetException:
+    compute_config = AmlCompute.provisioning_configuration(
+        vm_size="STANDARD_D2_V2",
+        max_nodes=1,
+        idle_seconds_before_scaledown=300, # Scale down after 5 minutes
+    )
+    cpu_cluster = ComputeTarget.create(ws, cpu_cluster_name, compute_config)
+#+end_src
+We wrap it in a try-except clause such that we don't create a new cluster every time we run the script. This is a common pattern for most resources in Azure ML: Try to get resources, and if it doesn't exist, create them.
+
+Add it as the compute target for the script run config
+#+begin_src python
+src = ScriptRunConfig('src', script='train.py', environment=local_env, compute_target=cpu_cluster)
+#+end_src
+
+Run the orchestration code again. If you look at the compute section in the Studio, you should see that a cluster is being created. It can take a couple of minutes. You can check the experiment section and see if a run has started. In the logs, you can start to see how the docker is being built, and how they run is started.
+
+
+* Convert your Notebook to an Azure ML Pipeline
+Note: this step is optional for this workshop.
+
+Azure ML Pipelines are a series of python scripts that runs in a given order. Each step can run on separate compute and in separate environments, such that you can use a small cluster for data preprocessing, and then a GPU-enabled compute instance to train your large deep learning models, without incurring excessive cost. Pipelines are a convenient way to both reuse experiment code, and also avoid the need to have to resubmit experiment code for every training session. However, they can be annoying to debug since they (for some reason) can't run on your local computer, and need to be submitted to Azure ML.
+
+Pipelines also allow us to use PipelineParameters, which can be set when calling a published pipeline. This is useful if you have training code that doesn't change much, but you regularly register a new dataset on which you want to retrain your model.
+
+Note: There is a slight difference in how Runs work in pipelines. The pipeline itself has a run each step is a child run with its own run id. For convenience, it is nice to log metrics both in the child and the parent-run. Similarly, it is often better to register the model to the parent-run, rather than the child run, since it makes it easier to inspect in the Studio
+
+#+begin_src python
+parent_run = run.parent
+#+end_src
+
+However, for this workshop, they don't serve any real purpose.
+Pipelines are similar to ScriptRunConfigs, with some minor changes.
+
+#+begin_src python
+run_config = RunConfiguration()
+run_config.environment = environment
+
+train_step = PythonScriptStep(
+    name="training_step",
+    script_name="train.py",
+    source_directory="src",
+    compute_target=cpu_cluster,
+    runconfig=run_config,
+    allow_reuse=False
+)
+
+pipeline = Pipeline(
+    workspace=ws, steps=[train_step], description="Model Training and Deployment"
+)
+pipeline.validate()
+published_pipeline = pipeline.publish("training_pipeline")
+#+end_src

@@ -1,0 +1,15 @@
+#+title: Mlops
+#+author: luklun
+#+date: 2022-05-09
+
+
+* DevOps and MLOps
+Before we can start to talk about MLOps we need to discuss its progenitor DevOps. DevOps (from the terms Development and Operations) is an organizational (or operational) approach where one strives for a tight integration betwween the software development and software operations (the deployment and business application of the software). The idea is that by tightly integrating dev and ops updates can made faster, new version deployed quicker, and developers can more efficiently monitor the  recieve feedback from customers and stakeholders.
+
+DevOps is not a technology per-se. Instead, it is a encompasing name that describes both *how* one should work and the tooling one should use. DevOps aims for short, controlled iteration (via e.g., Agile Development) in combination with advanced tooling (CI/CD) to push out changes faster.
+
+The key component to successful DevOps is heavy use of automation. The more of the development process that can be automated, such as quality assesment, testing, and deployment,  the more developers can focus on what really matters, developing code. This is some more test
+
+*MLOps* is the incorporation of DevOps practices in the development and operationalization of Machine Learning models. The sad state of affairs is that many machine learning models from fledgling DS projects from never reach production, and a large portion of those that do are not properly maintaned or allowed to generate value. This is what MLOps aims to solve. The idea is to tightly integrate the development of ML models with their operations, thereby allowing models to be quickly updated, and closely monitored, allow business to derive benifits from them.
+
+Similarly to DevOps, MLOps is not really a set of technology, instead it is an organizational approach for how to work with ML models to make deployment and maintance easy and efficient. It's not a set of technologies per se, but a lot of tooling is required in order to achive an MLOps workflow. The goal of todays is for you, both as data scientist and data engineers, to learn to convert a simple MVP (Minimal Vaiable Product) to a deployed machine learning models that is easy to improve, maintaine and monitor.

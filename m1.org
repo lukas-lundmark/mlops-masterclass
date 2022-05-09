@@ -1,0 +1,113 @@
+#+title: Python and Azure ML on M1
+#+author: luklun
+
+* Problem on M1
+To download and upload data, Azure ML requires a python package called azureml-dataprep-native. Unfortunately, there are no binary wheels available for ARM64 (M1 Silicon) on PyPI and there is no way to access the source code and build the wheels yourself. Therefore, to install all the required dependencies, we need to install and run Python as MacOS x86, since there are wheels available for that architecture.
+
+There are three different ways to do this:
+1. Conda with Rosetta x86 Emulation (Recommended)
+2. Brew and Pyenv with Rosetta x86 (works but is difficult to set up)
+3. Docker and Docker Compose (Easy to use but quite slow)
+
+The conda approach is recommended. We will use Azure ML to start other docker containers, which is difficult to do from inside a docker container.
+
+* Using Conda and Rosetta
+The easiest way to install all the dependencies on an M1 machine is to use conda.
+
+You can set the architecture of a conda environment by setting CONDA_SUBDIR before creation. If we want OSX x86 we simply specify
+
+#+begin_src bash
+CONDA_SUBDIR=osx-64 conda env create -f ci_dependencies.yml
+#+end_src
+
+* Using Pyenv and Rosetta
+Instead of using conda, we can use pyenv to install a x86 version of python, and then use a virtual environment in that python version to install dependencies. Note that this is quite involved.
+
+** Setting up Python for M1
+First, you need to install brew and pyenv normally. If you already have you can move on
+
+#+begin_src zsh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+#+end_src
+
+#+begin_src bash
+brew update && brew install pyenv
+#+end_src
+
+Add pyenv's shell initialization to your .zshrc
+#+begin_src bash
+echo 'eval "$(pyenv init -)"' >> $HOME/.zshrc
+#+end_src
+
+
+** Python for x86 with Rosetta
+Create a copy of the terminal application in your Mac. Rename the copy to Terminal Rosetta. Ctrl+click on the copy and select get info. Check "Open using Rosetta".
+
+Start an a new terminal using your new Terminal Rosetta. Install Homebrew again in the Rosetta Terminal
+#+begin_src zsh
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+#+end_src
+
+You will now have two versions of brew installed. One for your normal M1 located at /opt/homebrew/bin/brew, and one for Rosetta at /usr/local/bin/brew.
+
+You can check which version is the default on your system
+#+begin_src zsh
+which brew
+#+end_src
+
+Add the following at the end of your .zshrc file (either in $HOME/.zshrc or .config/zsh/.zshrc)
+#+begin_src bash
+alias brew="/opt/homebrew/bin/brew"
+if [ $(arch) = "i386" ]; then
+    alias brew86="/usr/local/bin/brew"
+    alias pyenv86="arch -x86_64 pyenv"
+fi
+#+end_src
+
+Restart the shell by typing
+#+begin_src bash
+zsh
+#+end_src
+
+We will then install a new version of Python for x86. Pyenv needs *zlib* to download and build new versions of Python. We install zlib first and then tell pyenv where it is located
+
+#+begin_src bash
+brew86 install zlib
+export LDFLAGS="-L/usr/local/opt/zlib/lib"
+export CPPFLAGS="-I/usr/local/opt/zlib/include"
+#+end_src
+
+Then, we can tell pyenv to install some python version for x86.
+#+begin_src bash
+pyenv86 install x.x.x
+#+end_src
+
+If something goes wrong you can try to inspect the logs by setting PYENV_DEBUG before running a pyenv command.
+
+#+begin_src bash
+export PYENV_DEBUG=1
+#+end_src
+
+Note: This will not work for all python versions, especially for older versions before 3.8.
+
+If you want to have a different name for your x86 installation, or have multiple versions of one python version installed you can install the pyenv-alias plugin.
+
+#+begin_src bash
+git clone https://github.com/s1341/pyenv-alias.git $(pyenv root)/plugins/pyenv-alias
+#+end_src
+
+And then, you can install a separate version of an existing python version with an alias like this
+#+begin_src bash
+VERSION_ALIAS="3.8.13_x86" PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv86 install 3.8.13
+#+end_src
+
+
+VERSION_ALIAS="3.7.9_x86" PYTHON_CONFIGURE_OPTS="--enable-shared" pyenv86 install 3.7.9
+
+* Docker
+The last option is to use Docker. In MLOps example repo there is a folder called environment_setup that contains a dockerfile and compose file which allows you to start a jupyter notebook with the required dependencies. The key is to use the --platform linux/amd64, which will make Docker use Rosetta emulation, allowing us to run an x86 application. If you use the compose file the flag is already set for you. Just run
+
+#+begin_src bash
+docker compose -f environment_setup/compose.yml up
+#+end_src
+to start a jupyter notebook with the required dependencies

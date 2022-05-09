@@ -1,0 +1,291 @@
+#+title: GitHub Integration - Day 1
+#+author: luklun
+
+* Getting Started
+If you haven't already done so, create a new, empty GitHub Repository (Although we can/will use some code from the public MLOps repo we will start with an empty git repository. This is so we are fully aware of what each piece of code does in our repo).
+
+Initialize the repo locally or remotely.
+
+** Getting Familiar with GitHub Actions
+If you are unfamiliar with CI/CD pipelines you can start simple.
+Create a .github/workflows directory in the project root directory. Open your text editor of choice and create a file named workflow.yaml. Write
+
+#+begin_src yaml
+name: Hello World
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  hello-world-job:
+    name: Hello World
+    runs-on: ubuntu-latest
+    steps:
+      - name: Say Hello
+        run: echo "HELLO WORLD"
+#+end_src
+
+This is a simple GitHub Workflow that will be triggered on pushes to the main branch. It starts a single job running on an ubuntu runner. The job has one single step that echoes HELLO WORLD to the console.
+
+Commit and push to main.
+#+begin_src bash
+git add .github/workflows
+git commit -m "Adding Hello World"
+git push origin main
+#+end_src
+
+Go to your repository page on GitHub and click the Action tab. You should see a new workflow run has started. Click on the workflow, and look at the different steps. One of them should have written HELLO WORLD to the console. Note that you didn't need to do anything other than creating a valid workflow file for a workflow to be created and started.
+
+If the workflow file is invalid, GitHub Action will notify you and point out where in your workflow definition you have an error.
+
+** Building Docker Images Automatically
+Since we want to be able to run some Azure ML code in our CI/CD pipelines, we need to assure that our runner has all the required dependencies. There are multiple ways to do this, one is to download the dependencies in every job. However, this is brittle, hard to maintain, and also time-consuming during runs. Instead, we can build our own Docker image, push it to a container registry and use it as the container for our runner.
+
+GitHub now offers its own Container Registry, called GitHub Container Registry (GHCR). Each account can push containers to its own registry, which is located at ghcr.io/{account}. You use the same credentials to access your registry as for your GitHub account. The most convenient way to get access to your registry is via a Personal Access Token.
+
+Go to Developer Settings on your GitHub profile. Select personal access token, and generate a new one. You want the Token to have read & write access to packages (packages are GitHub's term for published Docker Images). Create the token, and save it somewhere that you don't lose it.
+
+First, make sure that you can log in to your container registry. Open a terminal and run
+
+#+begin_src bash
+export CR_PAT=<your-new-token>
+echo $CR_PAT | docker login ghcr.io --username <your-github-name> --password-stdin
+#+end_src
+It should say "login successfull".
+
+Now, if you haven't already done so, copy the *environment_setup* folder from the workshop repo and add it to your repo. Try and see if you can build the docker locally first, and see if you can push it to your Container Repo
+
+#+begin_src bash
+docker build --platform linux/amd64 -t ghcr.io/<your-github-user>/mlopsci:latest environment_setup/
+#+end_src
+
+This can take up to five or six minutes, so you can read ahead if you want. When the docker image is built you can see if you can push it to your container registry. You should already be logged in so you should just be able to push
+
+#+begin_src bash
+docker push ghcr.io/<your-github-user>/mlopsci:latest
+#+end_src
+
+Check on your GitHub profile page, under the packages tab to see if you have a new package there. You can delete it if you want. If all that works, we are in a good position to automate the build of our CI container.
+
+Remember that Personal Access Token (you did save it, right?). Create a new GitHub secret in your repository. Go to the project settings, secrets, and action. Give it the name CR_PAT and past the in the access token.
+
+Now, we need to create a new job that will need to perform three different steps. It will need to checkout the current repo, it needs to login to GHCR, and it needs to build and push the image. Fortunately for us, there exist prebuilt GitHub Actions for all these steps. Below you can see an example of how this can be done
+
+#+begin_src yaml
+  build-and-push-docker-image:
+    name: Build Docker image and push to repositories
+    runs-on: ubuntu-latest
+      steps:
+        - name: Checkout Code
+          uses: actions/checkout@v2
+
+        - name: Login to Github Packages
+          uses: docker/login-action@v1
+          with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.CR_PAT }}
+
+        - name: Build and Push
+          uses: docker/build-push-action@v2
+          with:
+          context: ./environment_setup/
+          tags: ghcr.io/${{github.actor}}/mlopscli:latest
+#+end_src
+
+Add this job and see if your container builds and that you get a new package in your account.
+
+*** Improvements
+There are a few things we can improve. First, this job will now run every time we push. This is a bit wasteful since we have to waste a few minutes every time. Instead, we can add a filter step  before the build that checks if the environment definition was updated
+
+#+begin_src yaml
+- name: filter
+  uses: dorny/paths-filter@v2
+  id: filter
+  with:
+    filters: |
+      workflows:
+        - 'environment_setup/**'
+#+end_src
+
+We can then add an if-statement to the build step, making it so that it only builds if the commit contains relevant changes
+
+#+begin_src yaml
+# ...
+- name: Build and Push
+  uses: docker/build-push-action@v2
+  if: steps.filter.outputs.workflows == 'true'
+  # ...
+#+end_src
+
+Note that the job will still run and succeed, even if no files were updated, just that this step will be skipped if the filter wasn't triggered.
+
+The second improvement would be to add more tags to the image. Right now, we overwrite the previous image with a new one, which isn't good for reproducibility. A fix is to use two tags when building. One tag that uses the current commit hash, and one that uses the latest. This way, you know which build generated a certain image. In this workshop, it might be overkill, so try it if you want to
+
+#+begin_src yaml
+tags: |
+    "ghcr.io/${{github.actor}}/mlopsci:latest"
+    "ghcr.io/${{github.actor}}/mlopsci:${{github.sha}}"
+#+end_src
+
+** Connecting to Azure
+The environment we built contains both Azure CLI and the Azure ML. So the only thing we need is a way to log in using the Service Principle we created earlier. First of all, we need to add a dependency on the docker build job using ~needs~. This will make this job wait for the build job to finish
+
+#+begin_src yaml
+connect-to-azure:
+  needs: build-and-push-docker-image
+  name: Connect to Azure
+  runs-on: ubuntu-latest
+#+end_src
+
+Second, we need to use the container we built.
+
+#+begin_src yaml
+...
+container:
+  image: ghcr.io/${{gitub.actor}}/mlopsci:latest
+  credentials:
+    username: ${{ github.actor }}
+    password: ${{ secrets.CR_PAT }}
+#+end_src
+Unfortunately, GitHub Action doesn't allow you to do a dynamic reference to which image you want to use. So we need to hardcode it for now.
+
+(The combination of the runs-on and the container field means that the job will run on a ubuntu runner using your specified container.)
+
+Remember the Service Principle definition we saved earlier when we set up our service principle. You will now paste this into a secret named AZURE_CREDENTIALS.
+
+You can then login to Azure using the following Action
+#+begin_src yaml
+- name: Authenticate with Azure
+  uses: azure/login@v1
+  with:
+    creds: ${{ secrets.AZURE_CREDENTIALS }}
+#+end_src
+
+Your Azure ML workspace can be uniquely identified from three parameters: the subscription id, resource group, and workspace name. Your Service Principle now has access to the one subscription you gave it, but we should also set the default resource group and workspace name so we don't have to manually set these parameters.
+
+#+begin_src bash
+az configure -–defaults group=${{ env.RESOURCE_GROUP }} workspace={{ env.WORKSPACE_NAME}}
+#+end_src
+
+We can do this by setting the environment variables
+
+Add an environment variable definition at the top of the workflow file
+#+begin_src yaml
+env:
+  RESOURCE_GROUP="<your-resource-group>"
+  WORKSPACE_NAME="<workspace-name>"
+#+end_src
+
+And then create a step
+#+begin_src yaml
+- name: Set AZ Configs
+  run: |
+    az configure -–defaults \
+      group=${{ env.RESOURCE_GROUP }} \
+      workspace=${{ env.WORKSPACE}}
+#+end_src
+
+Similarly, we need to have a workspace config in our root directory for some as our local setup. You could, of course, add this file to your repository, but this will reduce our flexibility a lot and might be a bit dangerous.
+
+We can make all of this necessary setup by creating our own Github action. Local actions are made by creating an actions folder in the .github folder and adding a folder aml_login, with a file action.yml in it.
+
+#+begin_src yaml
+name: 'aml_log'
+description: 'Prepare Azure ML'
+
+# Defines the inputs
+inputs:
+  AZURE_CREDENTIALS:
+    description: "Azure Credential Object"
+    required: true
+  RESOURCE_GROUP:
+    description: "Name of ML Resource Group"
+    required: true
+  WORKSPACE:
+    description: "Name of ML workspace"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Authenticate with Azure
+      uses: azure/login@v1
+      with:
+        creds: ${{ inputs.AZURE_CREDENTIALS }}
+
+    # Actions need to define which shell to use
+    - name: Set AZ Configs
+      shell: bash
+      run: |
+        az configure --defaults group='${{ inputs.RESOURCE_GROUP }}'
+        az configure --defaults workspace='${{ inputs.WORKSPACE }}'
+
+    - name: Produce AML Config
+      shell: bash
+      run: |
+        # We assume this SP only has one subscription
+        SUBSCRIPTION=$(az account list --query [0].id --output tsv)
+        # Create a config object from our parameters using jq
+        JSON_STRING=$(jq -n \
+            --arg sub $SUBSCRIPTION \
+            --arg rg ${{ inputs.RESOURCE_GROUP }} \
+            --arg ws ${{ inputs.WORKSPACE }} \
+            '{subscription_id: $sub, resource_group: $rg, workspace_name: $ws}')
+        # Write the json string to the current repo
+        echo -e $JSON_STRING >> $PWD/config.json
+#+end_src
+
+This will log in to your Azure account. It will set the AZ CLI defaults, and it will create a workspace config.json file for you. Note that this requires the jq cli utility, which is already installed by default in our CI/CD Image.
+
+At the start of each Job that requires Azure ML, we simply run to set up our Azure ML environment. What we have done here is to reduce the boilerplate by making a reusable action component.
+
+#+begin_src yaml
+steps:
+  # We need to checkout the code to use loca actions
+  - name: Checkout Code
+    uses: actions/checkout@v2
+
+  - name: AML Login
+    uses: ./.github/actions/aml_login
+    with:
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+      RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
+      WORKSPACE: ${{ env.WORKSPACE }}
+#+end_src
+
+Actions are a convenient way to reduce code duplication (but I think  Azure DevOps's job templates are far superior).
+
+You should now be able to run the build process for the Azure ML pipeline or the AML training script we built earlier.
+
+#+begin_src yaml
+- name: Build Pipeline
+  # run: python -m ml_pipelines.train_pipeline
+  run: python -m ml_pipelines.run_train_script.py
+#+end_src
+
+Commit the changes to your workflow and see if you successfully built the pipeline or ran your script.
+
+Tips: If you have a problem with git in your Workflow complaining about you not having access to the repo you can add this extra step in the aml_login action
+#+begin_src yaml
+- name: Workaround permission error
+  run: git config --global --add safe.directory /__w/${{github.repository}}/${{github.repository}}
+#+end_src
+
+If you built a new pipeline based on code changes, we can make a similar job that will run the pipeline. The reason for having the build and the run in different jobs is because you might want the run to be triggered without having to rebuild the pipeline, say that the dataset is updated, or data drift is detected, or something similar.
+
+Create a new job that runs the training pipeline. Commit some changes and see if everything works as expected. If everything works correctly, you should now have an automatic CI pipeline that automatically runs your workflow on code changes. This is just the beginning, however, because if you start to integrate Azure ML with Event Hub we can start to send events to trigger our workflow. This will allow the workflow to run on updates to datasets or detected data drift, for example.
+
+Currently, these Azure ML events are available to use in Azure Event Hub:
+- ModelRegistered
+- ModelDeployed
+- RunCompleted
+- DatasetDriftDetected
+- RunStatusChanged
+
+With two jobs for training buildup and training execution, you are in a pretty good position to automate your training. Try to make some modifications to your training scripts.
+
+Tips: Some tips for testing and debugging.  Usually, I find it good to have two different experiments, and two different model names, when I am testing like. One for local testing, and one for serious runs. You can do this by using environment variables.
+
+There is a package called python-dotenv in the default environment. This package lets you load the environment variables from a file named .env in your current directory. It's good practice to have your orchestration code load local environment variables.

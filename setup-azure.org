@@ -1,0 +1,73 @@
+#+title: Setup Azure
+#+author: luklun
+
+
+* Azure and Azure ML
+Azure ML is one of many ML-as-a-Service offerings that exist on the market. There is nothing unique about it, but it allows us to manage almost every step of the model life-cycle using a single, and a (somewhat) consistent API, which makes it good for learning.
+
+You can read a brief introduction to Azure ML [[./azureml-info.org][here]], or watch the Recording of the presentation Introduction to Azure ML [[https://drive.google.com/file/d/1dngb8XDF2k96SzA93FPQsStdtUjZ1T7W/view?usp=sharing][here]].
+
+* Creating an Azure Account
+To do the workshop you need to have an Azure account with Admin privileges since we will create service principals for our CI/CD pipelines. Solita's Sandbox will not be enough, since you will not have sufficient privileges. Creating a new account takes ca. 10-15 minutes and it can be used immediately after you create it. You get 200 USD of free credits to use for 30 days. Use this [[https://azure.microsoft.com/en-us/free/][link]] to sign up.
+
+Things to note:
+1. If you are logged in to an existing Azure account - e.g. your Solita account - in your browser Azure will sometimes refuse to let you create a new one. You can often get around this by using a private window in your browser.
+
+2. You need to provide a Credit Card or Debit Card when signing up. You will not be charged anything even after 30 days or if you use up your 200USD credits unless you agree to keep paying. If you don't have a Credit Card or Debit Card we can try to find another solution.
+
+* Installing the Azure CLI
+The Azure CLI is a Python Application and is installed using pip. It's recommended that you don't use a version of Python newer than 3.8.13, because some of the ML extension we will download doesn't support newer versions (as of now).
+
+Note: If you followed the instructions for how to set up Python [[./setup-python.org][here]], you should already have the Azure CLI installed by default and you can skip this installation step
+
+#+begin_src bash
+pip install azure-cli
+#+end_src
+
+* Login to Azure
+#+begin_src bash
+az login
+#+end_src
+
+This will open a web portal in your default browser where you can enter your credentials. However, if you are managing multiple Azure accounts your browser might default to another login. In that case, you can use
+
+#+begin_src bash
+az login --use-device-code
+#+end_src
+This will give you a code and a URL you can enter in any browser. Open up a private tab in your browser and paste the URL and then enter the code.
+
+* Installing the Azure ML Extension
+Install the latest version of the Azure ML extension (if you used the conda environment this should have been installed automatically when you installed azureml-sdk)
+#+begin_src bash
+az extension add --name ml
+#+end_src
+
+* Creating an Azure ML Workspace
+There are three ways to create an Azure ML workspace, Azure Portal, CLI, or SDK. I would recommend that you use the Portal for this since it will show you all the options you can choose.
+
+Go to the Azure Portal, search work machine learning, and select Azure ML. Click on create a workspace, and give your workspace a suitable name. Otherwise, use the defaults.
+
+Note: One of the options at the bottom asks you if you want to set up a Container Registry for the workspace. Leave that *unchecked* for now. Container Registries consume a surprising amount of credits, even when inactive. This Container Registry is needed when we build Environments later for Azure ML, but Azure ML will automatically create one for you when you need it, so there is no need to create one at the start. The only reason to check it is if you already have an existing Container Registry you want your workspace to use.
+
+If you are interested, go into the Azure ML Studio and look around. See what each tab in the side menu contains. If you have watched the introduction to Azure ML presentation most of this should be familiar to you.
+
+* Setting CLI Defaults
+Almost all commands in AML CLI require a workspace. A workspace can be uniquely identified using your subscription, resource group, and workspace name. To not have to enter this information for all the commands we call, we can set them as defaults in the Azure CLI.
+
+Set the default subscription
+#+begin_src bash
+az account set -s <subscriptionId>
+#+end_src
+
+Similarly, you can set the default resource group and default workspace name
+#+begin_src bash
+az configure -–defaults group='<resource-group-name>'
+az configure --defaults workspace='<workspace-Name>'
+#+end_src
+
+Check that you can run this command without any errors. Should output an empty list since you don't have any models yet.
+#+begin_src bash
+az ml model list
+#+end_src
+
+You should now have access to your ML workspace from your command line.

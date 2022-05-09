@@ -1,0 +1,57 @@
+#+title: Instructions for Azure ML Day 1
+#+author: luklun
+
+* Instructions for Day 1
+
+** What is MLOps
+Before you start you might want to read a small introduction of [[./mlops.org][MLOps.]]
+
+** Preparing for the Workshop / Masterclass
+*** Example Code
+There is an example repository here that you can use as a reference if there is something you are unsure of. We will also copy some more complex boilerplate code from this repo during the workshop.
+
+*** Data
+Originally, this Workshop was meant to use the Citi Bike and OpenWeather data to predict hourly bike departures in New York. You can find that data here.
+
+However, there isn't anything in this workshop that requires that you use that data. If you want, you can use a more complex, or simpler dataset. The focus of this workshop isn't Data Science per se, but the process of automating training and managing models. And most of the instructions are data and model agnostic.
+
+For example, you may find the Diamonds regression dataset to be easier to work with since the data is almost ready to use from the start. Choose what you feel comfortable with.
+
+*** Tools and Utilities
+
+**** Python
+Python is the go-to tool for everything in Data Science and Data Engineering. To have an easier time developing, it is important to have a good setup for Python, where you can manage your dependencies and your environments with ease.
+
+You can find some instructions for how to prepare your python environment [[./setup-python.org][here]], along with some thoughts on how one should manage python environment in general.
+
+Note: M1 Users can look [[./m1.org][here]] for how they should set up their environment.
+
+**** Docker
+Since we will execute code both locally and on the cloud we will use Docker to define a consistent runtime environment for our code to run in.
+
+Read a Docker Introduction and installation information [[./docker.org][here]].
+
+**** Azure and Azure ML
+Azure ML is one of many ML-as-a-Service offerings that exist on the market. There is nothing unique about it, but it allows us to manage almost every step of the model life-cycle using a single, and consistent API, which makes it good for learning.
+
+Instructions for how to get started with Azure and Azure ML can be found [[./setup-azure.org][here]].
+
+**** GitHub
+We will use GitHub as our Code Repository and GitHub Actions as our CI/CD environment. You can create a new GitHub account for free, or use the GitHub account you use for your Solita work. GitHub Actions works for all versions of GitHub, so it doesn't matter which account you use.
+
+You can read a basic introduction to GitHub Actions [[./github-info.org][here]].
+**** Command Line
+We will make heavy use of the command line. Most commands in the examples should work on both Windows CMD and Unix shells. However, if you are on Windows you might want to consider downloading a more Unix-y terminal, such as the GitBash, or CMder.
+
+* Day 1 Instructions
+** Day1 Part 1 - Getting Started with Azure ML
+We start by setting up an experiment locally using [[./azureml-day-1.org][Azure ML]] to train Azure ML.
+You find the instructions [[./azureml-day-1.org][here]].
+
+** Day1 Part 2 - Integrate Azure ML with GitHub
+We will then automate our training process by integrating it with GitHub Actions.
+You find the instructions [[./github-day-1.org][here]].
+
+
+* Relevant Litterature
+Practical MLOps
