@@ -130,7 +130,28 @@ tags: |
 #+end_src
 
 ** Connecting to Azure
-The environment we built contains both Azure CLI and the Azure ML. So the only thing we need is a way to log in using the Service Principle we created earlier. First of all, we need to add a dependency on the docker build job using ~needs~. This will make this job wait for the build job to finish
+The next step is to run some Azure ML code in our Pipeline. In order for GitHub Action to interact with your AML workspace you need to give it access. The recommended way to give an automated process acccess to Azure resources is with a *Service Principal*. A Service Principle is a form of Azure account that doesn't belong to any user, and can instead by scripts and applications. SP accounts use the same Role-Based Authenticaction as all other accounts, and you can therefore make sure to only give the SP the minimal required roles for completing its task.
+
+We will create a Service Principal for Azure ML using the Azure CLI. First, login to your Azure account using the Azure CLI src_bash{az login}. Set the default subscription if you haven't already done so: src_bash{az account set -s your-subscription-id}. You can list your subscriptions using src_bash{az account list}.
+
+Then, create a service principle with role based authentication and sdk authentication, and give it access to the resource group of your ML Workspace.
+
+In total, run the following in your terminal
+#+begin_src bash
+az login
+# List your accounts
+az account list
+# Set a default account if you have more than one
+az account set -s your-subscription-id
+# Create a service principle
+az ad sp create-for-rbac --sdk-auth --name a-cool-name-for-the-sp --role contributor --scopes /subscriptions/<your-subscription-id>/resourceGroups/<resource-group-of-your-workspace>
+#+end_src
+
+This will output a json string in the terminal which defines the Service Principle. Copy this json string and save it somewhere that you don't lose it. Create a new secret in your repostiotory called *AZURE_CREDENTIALS* and paste the entire json string into it. We will use it in just a few steps.
+
+Now, the environment we built already contains both Azure CLI and the Azure ML Extension. So what we need is a way to run in our docker image and log in using the Service Principle we created in our jobs.
+
+First of all, we need to add a dependency on the docker build job using ~needs~. This will make this job wait for the build job to finish
 
 #+begin_src yaml
 connect-to-azure:
@@ -139,23 +160,19 @@ connect-to-azure:
   runs-on: ubuntu-latest
 #+end_src
 
-Second, we need to use the container we built.
+Second, we need to use the container we built. We can reference our container like this
 
 #+begin_src yaml
 ...
 container:
-  image: ghcr.io/${{gitub.actor}}/mlopsci:latest
+  image: ghcr.io/<your-username>/<mame-of-image>:latest
   credentials:
     username: ${{ github.actor }}
     password: ${{ secrets.CR_PAT }}
 #+end_src
-Unfortunately, GitHub Action doesn't allow you to do a dynamic reference to which image you want to use. So we need to hardcode it for now.
+Unfortunately, GitHub Action doesn't allow you to do dynamic reference to docker image you want to use. So we need to hard-code it for now. The combination of the runs-on and the container field means that the job will run on a Ubuntu Runner using our container.
 
-(The combination of the runs-on and the container field means that the job will run on a ubuntu runner using your specified container.)
-
-Remember the Service Principle definition we saved earlier when we set up our service principle. You will now paste this into a secret named AZURE_CREDENTIALS.
-
-You can then login to Azure using the following Action
+You can then login to Azure using the following Action using the service principle definition we created before secret
 #+begin_src yaml
 - name: Authenticate with Azure
   uses: azure/login@v1
@@ -163,13 +180,14 @@ You can then login to Azure using the following Action
     creds: ${{ secrets.AZURE_CREDENTIALS }}
 #+end_src
 
-Your Azure ML workspace can be uniquely identified from three parameters: the subscription id, resource group, and workspace name. Your Service Principle now has access to the one subscription you gave it, but we should also set the default resource group and workspace name so we don't have to manually set these parameters.
+Your Azure ML workspace can be uniquely identified from three parameters: the subscription id, resource group, and workspace name. Your Service Principle now has access to the one subscription you gave it, but we should also set the default resource group and workspace name so we don't have to manually set these parameters in all subsequent calls. You can configure Azure CLI like this
 
 #+begin_src bash
-az configure -–defaults group=${{ env.RESOURCE_GROUP }} workspace={{ env.WORKSPACE_NAME}}
+az configure -–defaults group=<resource-gruop>
+az configure --defaults workspace=<workspace>
 #+end_src
 
-We can do this by setting the environment variables
+We need to set the following environment variables
 
 Add an environment variable definition at the top of the workflow file
 #+begin_src yaml
@@ -182,14 +200,27 @@ And then create a step
 #+begin_src yaml
 - name: Set AZ Configs
   run: |
-    az configure -–defaults \
-      group=${{ env.RESOURCE_GROUP }} \
-      workspace=${{ env.WORKSPACE}}
+    az configure --defaults group='${{ env.RESOURCE_GROUP }}'
+    az configure --defaults workspace='${{ env.WORKSPACE }}'
 #+end_src
 
-Similarly, we need to have a workspace config in our root directory for some as our local setup. You could, of course, add this file to your repository, but this will reduce our flexibility a lot and might be a bit dangerous.
+Similarly, we need to have a workspace config in our root directory for some as our local setup. You could, of course, add this file to your repository, but that seems ill-adviced.
 
-We can make all of this necessary setup by creating our own Github action. Local actions are made by creating an actions folder in the .github folder and adding a folder aml_login, with a file action.yml in it.
+This small little script allows you to recreate the workspace configuration, given two environment variables RG and WORKSPACE
+
+#+begin_src bash
+SUBSCRIPTION=$(az account list --query '[0].id' --output tsv)
+# Create a config object from our parameters using jq
+JSON_STRING=$(jq -n \
+    --arg sub $SUBSCRIPTION \
+    --arg rg $RG \
+    --arg ws $WORKSPACE \
+    '{subscription_id: $sub, resource_group: $rg, workspace_name: $ws}')
+# Write the json string to the current repo
+echo -e $JSON_STRING >> $PWD/config.json
+#+end_src
+
+However, at this point, this is becoming a lot of boiler plate to just connect to Azure ML. We can make all of this necessary setup by creating our own Github action. Local actions are made by adding an *actions* folder in the .github directory.  Create a folder named aml_login in actions and an empty file action.yml in it. The following code defines an action that takes the Azure Credentials, Resource Group, and Workspace name and performs the steps we outlined earlier.
 
 #+begin_src yaml
 name: 'aml_log'
@@ -208,7 +239,7 @@ inputs:
     required: true
 
 runs:
-  using: "composite"
+  using: "composite" # This action is a composite of other actions
   steps:
     - name: Authenticate with Azure
       uses: azure/login@v1
@@ -255,13 +286,13 @@ steps:
       WORKSPACE: ${{ env.WORKSPACE }}
 #+end_src
 
-Actions are a convenient way to reduce code duplication (but I think  Azure DevOps's job templates are far superior).
+Actions are a convenient way to reduce code duplication (although I think Azure DevOps's job templates are far superior).
 
 You should now be able to run the build process for the Azure ML pipeline or the AML training script we built earlier.
 
 #+begin_src yaml
 - name: Build Pipeline
-  # run: python -m ml_pipelines.train_pipeline
+  # run: python -m ml_pipelines.build_train_pipeline
   run: python -m ml_pipelines.run_train_script.py
 #+end_src
 
