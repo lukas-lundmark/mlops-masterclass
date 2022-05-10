@@ -10,11 +10,11 @@ Before you start you might want to read a small introduction of [[./mlops.org][M
 There is a public [[https://github.com/lukas-lundmark/mlops-example][example repository]] that you can use as a reference if there is something you are unsure of. We will also copy some more complex boilerplate code from this repo during the workshop.
 
 *** Data
-Originally, this Workshop was meant to use the Citi Bike and OpenWeather data to predict hourly bike departures in New York. You can find that data here.
+Originally, this Workshop was meant to use the Citi Bike and OpenWeather data to predict hourly bike departures in New York. You can find that data here (TODO).
 
 However, there isn't anything in this workshop that requires that you use that data. If you want, you can use a more complex, or simpler dataset. The focus of this workshop isn't Data Science per se, but the process of automating training and managing models. And most of the instructions are data and model agnostic.
 
-For example, you may find the [[https://www.kaggle.com/datasets/shivam2503/diamonds][Diamonds]] regression dataset to be easier to work with since the data is almost ready to use from the start. Choose what you feel comfortable with.
+For example, you may find the [[https://github.com/Pratik-Bhujade/Diamond-Dataset/blob/master/DiamondData.csv][Diamonds]] regression dataset to be easier to work with since the data is almost ready to use from the start. Choose what you feel comfortable with.
 
 *** Tools and Utilities
 

@@ -301,7 +301,9 @@ Commit the changes to your workflow and see if you successfully built the pipeli
 Tips: If you have a problem with git in your Workflow complaining about you not having access to the repo you can add this extra step in the aml_login action
 #+begin_src yaml
 - name: Workaround permission error
-  run: git config --global --add safe.directory /__w/${{github.repository}}/${{github.repository}}
+  run: |
+    REPOSITORY_NAME=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
+    git config --global --add safe.directory /__w/$REPOSITORY_NAME/$REPOSITORY_NAME
 #+end_src
 
 If you built a new pipeline based on code changes, we can make a similar job that will run the pipeline. The reason for having the build and the run in different jobs is because you might want the run to be triggered without having to rebuild the pipeline, say that the dataset is updated, or data drift is detected, or something similar.
