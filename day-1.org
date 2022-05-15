@@ -44,9 +44,16 @@ We will make heavy use of the command line. Most commands in the examples should
 
 * Day 1 Instructions
 ** Day1 Part 1 - Getting Started with Azure ML
-We start by setting up an experiment locally using [[./azureml-info.org][Azure ML]] to train our model. You find the instructions [[./azureml-day-1.org][here]].
+We start by setting up an experiment locally using [[./azureml-info.org][Azure ML]] to train our model in a notebook. You find the instructions [[./azureml-day-1.org][here]].
 
-** Day1 Part 2 - Integrate Azure ML with GitHub
+** Day1 Part 2 - Deploying a Model
+We go through common ways to deploy models and play around with local and cloud deployment in Azure ML. You find the instructions [[./deployments-day1.org][here]].
+
+** Day1 Part 3 - From Notebooks to Pipelines
+We convert our notebook to a training script and an ML pipeline that we run on remote compute.
+You find the instructions [[./azureml-pipelines.org][here]].
+
+** Day1 Part 4 - Managing Pipelines from GitHub
 We will then automate our training process by integrating it with GitHub Actions. You find the instructions [[./github-day-1.org][here]].
 
 * Relevant Litterature

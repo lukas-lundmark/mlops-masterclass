@@ -2,7 +2,7 @@
 #+author: luklun
 
 * Docker
-We will use Docker in every step of this Master Class. We will build Containers to run both locally for debugging as well as running in our CI/CD pipelines. Similarly, Azure ML will use docker to run its experiments locally in containerized environments.
+We will use Docker in almost every step of this Master Class. We will build Containers to run both locally for debugging as well as running in our CI/CD pipelines. Similarly, Azure ML will use docker to run its experiments locally in containerized environments.
 
 Docker is easy to install on most platforms (my Windows experience is limited).
 https://docs.docker.com/get-docker/
@@ -18,7 +18,7 @@ An immutable template, or snapshot, of a virtualized environment from which cont
 
 Docker Images are created from Dockerfiles, which are a set of instructions that defines the state of the Image. New images are often created from preexisting images, such as ubuntu:18.04 with some additional dependencies installed.
 
-Example
+Example:
 
 #+begin_src docker
 # Base Image

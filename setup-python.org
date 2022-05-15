@@ -1,12 +1,9 @@
-#+title:
-#+author: luklun
-
 * Preparing Python
 My recommendation is to install [[https://docs.conda.io/en/latest/miniconda.html][Conda]] (or [[https://mamba.readthedocs.io/en/latest/installation.html][Mamba]]) to manage your environment, but you can use whatever environment manager you feel comfortable with. (M1 users can read [[./m1.org][here]] for instructions on how to set up their environment locally).
 
-Create a new repository for the MLOps workshop. Copy the folder environment_setup from the workshop example repository and place it in your new directory.
+Create a new repository for the MLOps workshop. Copy the folder environment_setup from the workshop [[https://github.com/lukas-lundmark/mlops-example/tree/main/environment_setup][example repository]] and place it in your new directory.
 
-Create the environment usin conda (or mamba) and activate it for the current environment
+Create the new environment using conda (or mamba) and activate it for the current environment
 #+begin_src bash
 conda env create -f environment_setup/ci_dependencies.yaml
 conda activate mlopspython_ci
@@ -50,7 +47,7 @@ channels:
 
 dependencies:
   # Python version for this environment
-  - python=3.10.*
+  - python=3.8.*
   - numpy=1.22.*
 
   # Pip version to download pip packages with

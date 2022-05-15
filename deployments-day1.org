@@ -1,0 +1,266 @@
+#+title:
+#+author: luklun
+#+date: 2022-05-14
+
+* Deploying Models
+You should now have a remarkable POC model that is garuanteed to provide value to the business, we now want to hand it over to operations and have it deployed as a webservice that our.
+
+* Deploying Machine Learning Models
+There are three general approaches to serving of machine learning models.
+
+1. Online
+   The model is exposed to users and programmers as an API running as a hosted webservice. Needs to have little delay and be able to scale quickly.
+
+2. Batch
+   The model can be exposed as an API. Will run prediction on large batches of data, often in cloud storage, and write the result. Startup delays are tolerated, meaning that compute costs can be reduced.
+
+3. Edge
+   Models are deployed to an edge device, like a Rasberry Pie, a sensor.
+
+This workshop will focus on Online deployment, since it is the easiest to setup and test.
+
+* Deploying in Azure ML
+Azure ML provides a variety of different methods to deploy a model.
+
+1. Model Packaging
+   Azure ML builds a containerized REST API service for your model which you can run anywhere.
+
+2. Webservice
+   Essentially Model Packaging but is managed by Azure ML. It reates things like key authentication.  Webserices can run locally (mostly for debugging) but is meant to run using Azure ML compute.
+
+3. Batch Inference Pipeline
+   Same training pipelines, however, it has a special configuration that allows it to run certain steps in parallel.
+
+4. Online Endpoint
+   A feature in public preview (i.e., not fully released yet). Endpoints are a more advanced version of webservices. It is essentially a Wrapper around Kubernetes, where you may have multiple deployments of your webservice running and you can configure how much traffic each version should get. This allows you to shift traffic gradually from older stable version to newer versions, so called blue-green deployment.
+
+5. Batch Online Endpoint
+   Similar to online endpoint, but for batch inference. More latency, but less expensive to run.
+
+In this workshop, we will rely mostly on Model Packaging and Web Services.
+
+* Microservices and Webservices
+Models are often deployed as microservices, i.e., small, self contained web services.
+Often one uses a microservice library, such as Flask, or FastAPI, to expose a REST API for your model.
+A very basic Machine Learning microservice can look something like this (this is just an example)
+
+#+begin_src python
+# Initialize the Flask webservice
+import joblib
+from flask import Flask, requests, jsonify
+app = Flask(__name__)
+
+# Initialize the model from disk
+def init():
+    global model
+    model = joblib.load("path-to-model.joblib")
+
+# Create a path in the API that runs the models and returns predictions
+@app.route("/score", methods=['POST'])
+def run():
+    json_data = requests.json
+    inputs = json_data['inputs']
+    predictions = model.predict(inputs)
+    return jsonify({"predictions": predictions})
+
+
+if __name__ == "__main__":
+    init()
+#+end_src
+
+This can then be called as any other API
+#+begin_src python
+import requests
+response = requests.post("https://127.0.0.1:5000:/score", data={"inputs": [0.1, 0,2]})
+print(response.json)
+#+end_src
+
+* Microservices using Azure ML
+Most of Azure ML deployment options relies on an almost identical setup. They use a 'scoring' or entry scripts to define how models should be served. The scoring scripts consist of two functions.
+
+The first is *init*, which takes no arguments and only runs a single time when the container is initialized. This method should be used to initialize the model by e.g., load it from the model registry.
+
+The second is the *run* function, which takes as input the data from the POST call and returns some predictions
+
+#+begin_src python
+import os
+import json
+
+def init():
+    global model
+    # This environment variable is set by Azure
+    model_path = os.path.join(os.getenv('AZUREML_MODEL_DIR'), 'name-of-model.pkl')
+    model = joblib.load(model_path)
+
+def run(raw_data):
+    inputs = json.loads(raw_data['inputs'])
+    response = model.predict(inputs)
+    return response.tolist()
+#+end_src
+
+A deployment in Azure ML is at its core defined by two components: Its scoring script and its environment. The environment defines the contents of the container running the deployment, and the score scripts defines what happens on request to the deployment. Models are, of course, also needed, but a model is essentally nothing more than a reference to the path in the model registry. Similarly,  it is possible to provision Azure ML computation for the deployment, or we can execute the service locally, or manually deploy it to a cluster we control.
+
+In order to deploy our cool little POC, we will start by writing a very basic score script and an orchestration script that packages it as a service. We will then deploy the service locally, and then deploy it to Azure.
+
+** Optional: Arguments and environment variables
+Let's go on a little tangent. Environment variables are a convinient way to control your application without having to change how you call it. E.g., say you want to use a different experiment-name when developing and testing ML pipelines, compared to when it is employed.
+
+However, working with environment variables in Python can easily get annoying. Although it's  easy to access the value of an environment variable via the src_python{os.environ} dictionary.  it can quickly becomes messy and unclear for others using your code what variables can be set in your code, and what their purpose are.
+
+A more well-structured method is to use a combination of python-classes and the package python-dotenv. The src_python{load_dotenv}  function in module dotenv will look for a file named .env in your current working directory and load the environment variable definitions in it. If it can't find any, it will do nothing. You can create a .env file with content like, setting those environment variables you want
+
+#+begin_src bash
+# ./.env
+VARIABLE_NAME1="variable-value"
+VARIABLE_NAME2="variable-value2"
+#+end_src
+
+Wrapping the call to load_dotenv and the loading of the variables within a class creates a single point of truth where all relevant variables are defined (and optionally documented). It can look like this:
+
+#+begin_src python
+# ml_pipelines/utils.py
+import os
+from dataclasses import dataclass
+from dotenv import load_dotenv
+
+from typing import Optional
+
+@dataclass
+class EnvironmentVariables:
+    load_dotenv()
+    model_name: Optional[str] = os.environ.get("MODEL_NAME", "default-model-name")
+    experiment_name: Optional[str] = os.environ.get("EXPERIMENT_NAME", "default-experiment-name")
+    ...
+
+#+end_src
+
+Create a file called utils.py in your ml_pipelines folder and create a class like this. You can then use it in your orchestration script and get access to the relevant variables. If you want some suggestsion on useful variables to use see the example class in the [[https://github.com/lukas-lundmark/mlops-example/blob/main/ml_pipelines/utils.py][example repository]] or the [[https://github.com/microsoft/MLOpsPython/blob/master/ml_service/util/env_variables.py][Microsoft's Azure ML MLOps directory]].
+
+#+begin_src python
+from ml_pipelines.utils import EnvironmentVariables
+
+# Load relevant environment variables
+env_vars = EnvironmentVaribles()
+# ...
+model = Model(workspace, name=env_vars.model_name)
+experiment = Experiment(workspace, name=env_vars.experiment_name)
+#+end_src
+
+Later, when we run our scripts in a CI/CD environment, we can just set these variables in the environment definition.
+
+* Environments
+Azure ML's Environments are essentially a wrapper around Docker, but it offers some convinient ways to specify the contents of the environment. Here we use the same conda definition file we used to initialize our local environment (here in the [[https://github.com/lukas-lundmark/mlops-example/blob/main/environment_setup/ci_dependencies.yml][example repo]]) to create an Azure ML environment. We then let AML build the docker image from it's default ubuntu image and instantiate the conda environment within. (Later on, we will build our own images using a similar approach. But for now, we let Azure ML do the heavy lifting.)
+
+Since we already have a definition file, we can create the environment like the following. Here we use a very commong access pattern in Azure ML where we first try to download a resource, and creates it if we couldn't locate it
+
+#+begin_src python
+# ml_pipelines/local_deployment.py
+# Might be a nice place to use Environment Variables
+conda_file = 'environment_setup/ci_dependencies.yml'
+environment_name = 'my-environment'
+
+try:
+    env = Environment.get(ws, name=environment_name)
+except Exception:
+    assert env_vars.environment_file is not None
+    env = Environment.from_conda_specification(
+        name=environment_name, file_path=conda_file
+    )
+#+end_src
+
+Since we will use this environments alot it might be a good idea to move this code-snippet into its own function, e.g., src_python{get_environment} in the utils module.
+
+
+* Defining the webservice
+So, we should now have a scoring script and an environment. We then create an inference config from this information, and then find the latest version of our model.
+
+#+begin_src python
+from azureml.core import Workspace, Model
+from azureml.core.model import InferenceConfig
+from ml_pipelines.utils import EnvironmentVariables, get_environment
+# ...
+
+workspace = Workspace.from_config()
+env_vars = EnvironmentVariables()
+environment = get_environment(workspace, env_vars)
+inference_config = InferenceConfig(
+    entry_script=env_vars.scoring_file,
+    source_directory=env_vars.scoring_dir,
+    environment=environment,
+)
+# Will return the latest version of the model
+model = Model(workspace, name=env_vars.model_name, version=None)
+#+end_src
+
+You can then build the webservice as a docker container and wait for it to finish
+#+begin_src python
+package = Model.package(workspace, models=[model], inference_config=inference_config)
+package.wait_for_creation(show_output=True)
+# Print the location of the new docker image
+print(package.location)
+#+end_src
+
+Create a new script from all this and place it in the ml_piplines folder. Run the script and package the model. This will take a while, 5-10 minutes. Azure ML will first create the environment image first, and then it will build a service image based on that image and your score script.
+
+The field *location* in the packaged model will point to the new microservice image in your Azure Container Registry
+
+First, login to your Azure Container Registry (you should be able to see the name of your registry the page of your workspace in the Azure Portal).
+#+begin_src bash
+az acr login --name <name-of-your-azure-container-registry>
+#+end_src
+
+Then, you can run the container on your local machine
+#+begin_src bash
+docker run <location-of-your-webservice> -p 6891:5001 --name my-cool-webservice
+#+end_src
+
+You can then call the model freely. TODO
+
+* Deploying to Azure ML
+
+Defining a small kubernetes cluster is usually not a problem. If you have a free subscriptions, your vCPU quota is usually quite small, so we should limit ourselves to using a single node. Standard production clusters require a minimum of three nodes, so you should set the cluster purpose to DEV_TEST.
+
+Something like this should do the trick.
+#+begin_src python
+inference_cluster_name = "my-aks"
+try:
+    aks_target = AksCompute(workspace, name=inference_cluster_name)
+except ComputeTargetException:
+    provisioning_config = AksCompute.provisioning_configuration(
+        vm_size='Standard_D2as_v4',
+        agent_count = 1,
+        cluster_purpose = AksCompute.ClusterPurpose.DEV_TEST
+    )
+    aks_target = ComputeTarget.create(
+        workspace = workspace,
+        name = inference_cluster_name,
+        provisioning_configuration = provisioning_config
+    )
+    aks_target.wait_for_completion(show_output = True)
+#+end_src
+
+Then, instead of packaging the model like we did before, we define a Kubernetes Weservice configuration and deploy our model.
+
+#+begin_src python
+model = Model(workspace, name=env_vars.model_name, version=args.model_version)
+deployment_config = AksWebservice.deploy_configuration(cpu_cores = 1, memory_gb = 1)
+
+service = Model.deploy(
+    workspace=workspace,
+    name=env_vars.service_name,
+    models=[model],
+    inference_config=inference_config,
+    deployment_config=deployment_config,
+    overwrite=True,
+    deployment_target=aks_target
+)
+service.wait_for_deployment(show_output=True)
+print(service.scoring_uri)
+#+end_src
+
+Running this script can take up to 10 minutes, with most of the time being spent setting up compute cluster. Since we reused our previous environment we don't have to rebuild the container.
+
+You can run the request script and change the call URI to the scoring URI of our new model.
+
+* Final Thougths
+So far, we have created a very basic POC and we have already deployed it as a webservice running in "production". Your project can now be considered MLOps Level 0 compatible. The next step is now to move towards MLOps Level 1, by making our training automated the training. In the step after that, we will move towards running training in GitHub.
