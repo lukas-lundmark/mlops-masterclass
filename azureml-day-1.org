@@ -39,7 +39,7 @@ One of the most basic utilities AML offers is the ability to store and version y
 
 #+begin_src python
 import pandas as pd
-df = pd.from_csv(...)
+df = pd.read_csv(...)
 #+end_src
 
 You can register and upload a dataset the following way
