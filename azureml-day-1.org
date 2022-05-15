@@ -23,7 +23,7 @@ In your notebook, import the Azure Machine Learning package. If you initialized 
 
 #+begin_src python
 from azureml.core import Workspace, Experiment, Dataset, Datastore, Run, Model
-from azureml.exceptions import UserErrorExcepion
+from azureml.exceptions import UserErrorException
 #+end_src
 
 Access your workspace from the config by instantiating a workspace object.
