@@ -14,7 +14,7 @@ We are gonna start with getting familiar with Azure ML and how it can be used to
 ** Starting a Jupyter Notebook
 Before you start the notebook it can be a good idea to login to your [[./setup-azure.org][Azure CLI]]. Also, make sure you have activated your python environment. Then run
 
-Start a Jupyter Notebook Server from the root of your repos root directory and try to run through the notebook one time. You will need to download the data from the Google drive in order to run the experiment.
+Start a Jupyter Notebook Server from the root of your repos root directory and try to run through the notebook one time. You will need to download the data from the [[https://drive.google.com/drive/u/0/folders/1BuHRP-4f8Ai4j8nqwLYcB1KZSJIy7mQz][Google drive]] and place it in a folder called data in order to run the experiment.
 
 ** Access your workspace
 After you have made sure that the experiments works locally, the next step is to connect to the cloud. In the launcher for Azure ML workspace in the Azure Portal (not the Studio), download the workspace config file and add it to the root folder. Create a .gitignore file and add config.json to it so you don't accidentally push that file to your repo. This configuration file identifies your Azure ML workspace and if you are in an environment with access to that workspace, i.e., you are logged in via your Azure CLI, you have access to all of the workspace's resources.
