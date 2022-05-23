@@ -104,6 +104,17 @@ A deployment in Azure ML is at its core defined by two components: Its scoring s
 
 In order to deploy our cool little POC, we will start by writing a very basic score script and an orchestration script that packages it as a service. We will then deploy the service locally, and then deploy it to Azure.
 
+** Imports in the Scoring script
+When the Webservice invokes your scoring script it will do so from the source directory you specified in the inference configuration. The entire source directory is also copied to the service. This means that you can import functions from other files in your source directory in your score script. For example, if you have a data preparation function called *clean_data* in src/data/prepare.py you can import it as follows in your score script
+
+#+begin_src python
+# src/score.py
+from data.prepare import clean_data
+# ...
+#+end_src
+
+this is a convinient way further split up your training and scoring functionality.
+
 ** Utility Script
 In order to help you test your deployment there exists a simple python script that takes a csv file and url as input and sends a single post request to the url. Copy the file send_requests.py in the *ml_pipelines* from the example repo.
 
@@ -313,6 +324,9 @@ print(service.scoring_uri)
 #+end_src
 
 Running this script can take up to 10 minutes, with most of the time being spent setting up the compute cluster. Since we reused our previous package, we don't have to rebuild the container.
+
+
+
 
 * Final Thougths
 So far, we have created a very basic POC and we have already deployed it as a webservice running in a mock production environment. Your little project can now be considered as being MLOps Level 0. The next step is now to move towards MLOps Level 1, by making our training automated. In the step after that, we will move towards running training in GitHub.
