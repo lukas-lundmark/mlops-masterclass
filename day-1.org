@@ -7,14 +7,11 @@ Before you start you might want to read a small introduction of [[./mlops.org][M
 
 ** Preparing for the Workshop / Masterclass
 *** Example Code
-There is a public [[https://github.com/lukas-lundmark/mlops-example][example repository]] that you can use as a reference if there is something you are unsure of. We will also copy some more complex boilerplate code from this repo during the workshop.
+We frequently reference this [[https://github.com/lukas-lundmark/mlops-example][example repository]]. This respository serves to purposes. First, we will use some files here as the base for our own project. Second, you may use the scripts there as reference for your own implementation if you are unsure about something.
 
 *** Data
-Originally, this Workshop was meant to use the Citi Bike and OpenWeather data to predict hourly bike departures in New York. You can find that data here (TODO).
+We will use the commonly used Diamond dataset in our experiments. You can find a training and test split of the dataset in the Google Drive here.
 
-However, there isn't anything in this workshop that requires that you use that data. If you want, you can use a more complex, or simpler dataset. The focus of this workshop isn't Data Science per se, but the process of automating training and managing models. And most of the instructions are data and model agnostic.
-
-For example, you may find the [[https://github.com/Pratik-Bhujade/Diamond-Dataset/blob/master/DiamondData.csv][Diamonds]] regression dataset to be easier to work with since the data is almost ready to use from the start. Choose what you feel comfortable with.
 
 *** Tools and Utilities
 
@@ -43,6 +40,11 @@ You can read a basic introduction to GitHub Actions [[./github-info.org][here]].
 We will make heavy use of the command line. Most commands in the examples should work on both Windows CMD and Unix shells. However, if you are on Windows you might want to consider downloading a more Unix-y terminal, such as the GitBash, or CMder.
 
 * Day 1 Instructions
+
+Day 1 Presentation can be found [[https://docs.google.com/presentation/d/1NFbbvjmwhlM5d4xiPC8n6wXoMj9552jhWzCr8yJVTmg/edit?usp=sharing][here]]
+Data for the workshop can be found here
+Example Repo with Code examples can be found here
+
 ** Day1 Part 1 - Getting Started with Azure ML
 We start by setting up an experiment locally using [[./azureml-info.org][Azure ML]] to train our model in a notebook. You find the instructions [[./azureml-day-1.org][here]].
 
@@ -52,9 +54,6 @@ We go through common ways to deploy models and play around with local and cloud 
 ** Day1 Part 3 - From Notebooks to Pipelines
 We convert our notebook to a training script and an ML pipeline that we run on remote compute.
 You find the instructions [[./azureml-pipelines.org][here]].
-
-** Day1 Part 4 - Managing Pipelines from GitHub
-We will then automate our training process by integrating it with GitHub Actions. You find the instructions [[./github-day-1.org][here]].
 
 * Relevant Litterature
 - Practical MLOps

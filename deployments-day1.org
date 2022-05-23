@@ -40,8 +40,8 @@ Azure ML provides a variety of different methods to deploy a model.
 In this workshop, we will rely mostly on Model Packaging and Web Services.
 
 * Microservices and Webservices
-Models are often deployed as microservices, i.e., small, self contained web services.
-Often one uses a microservice library, such as Flask, or FastAPI, to expose a REST API for your model.
+Models are often deployed as microservices, i.e., a small, self-contained web services.
+Often one uses a microservice library, such as Flask, or FastAPI, to expose a REST API for the model.
 A very basic Machine Learning microservice can look something like this (this is just an example)
 
 #+begin_src python
@@ -52,10 +52,10 @@ app = Flask(__name__)
 
 # Initialize the model from disk
 def init():
-    global model
+    global model # Add the model variable to the global namespace
     model = joblib.load("path-to-model.joblib")
 
-# Create a path in the API that runs the models and returns predictions
+# Create a route in the API that runs the models and returns predictions
 @app.route("/score", methods=['POST'])
 def run():
     json_data = requests.json
@@ -63,9 +63,9 @@ def run():
     predictions = model.predict(inputs)
     return jsonify({"predictions": predictions})
 
-
 if __name__ == "__main__":
     init()
+    app.run()
 #+end_src
 
 This can then be called as any other API
@@ -89,7 +89,10 @@ import json
 def init():
     global model
     # This environment variable is set by Azure
-    model_path = os.path.join(os.getenv('AZUREML_MODEL_DIR'), 'name-of-model.pkl')
+    model_path = os.path.join(
+        os.getenv('AZUREML_MODEL_DIR'),
+        'name-of-model.pkl'
+    )
     model = joblib.load(model_path)
 
 def run(raw_data):
@@ -188,9 +191,11 @@ inference_config = InferenceConfig(
     source_directory=env_vars.scoring_dir,
     environment=environment,
 )
-# Will return the latest version of the model
+# Will return the latest model version
 model = Model(workspace, name=env_vars.model_name, version=None)
 #+end_src
+
+#+RESULTS:
 
 You can then build the webservice as a docker container and wait for it to finish
 #+begin_src python
