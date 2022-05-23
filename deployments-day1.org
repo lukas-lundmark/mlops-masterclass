@@ -86,27 +86,41 @@ The second is the *run* function, which takes as input the data from the POST ca
 import os
 import json
 
+
 def init():
     global model
     # This environment variable is set by Azure
-    model_path = os.path.join(
-        os.getenv('AZUREML_MODEL_DIR'),
-        'name-of-model.pkl'
-    )
+    model_path = os.path.join(os.getenv("AZUREML_MODEL_DIR"), "name-of-model")
     model = joblib.load(model_path)
 
 def run(raw_data):
-    inputs = json.loads(raw_data['inputs'])
-    response = model.predict(inputs)
-    return response.tolist()
+    records = json.loads(raw_data)
+    df = pd.DataFrame(records)
+    df["predicted_price"] = model.predict(df)
+    return json.dumps(df.to_dict(orient="records"))
 #+end_src
 
 A deployment in Azure ML is at its core defined by two components: Its scoring script and its environment. The environment defines the contents of the container running the deployment, and the score scripts defines what happens on request to the deployment. Models are, of course, also needed, but a model is essentally nothing more than a reference to the path in the model registry. Similarly,  it is possible to provision Azure ML computation for the deployment, or we can execute the service locally, or manually deploy it to a cluster we control.
 
 In order to deploy our cool little POC, we will start by writing a very basic score script and an orchestration script that packages it as a service. We will then deploy the service locally, and then deploy it to Azure.
 
+** Utility Script
+In order to help you test your deployment there exists a simple python script that takes a csv file and url as input and sends a single post request to the url. Copy the file send_requests.py in the *ml_pipelines* from the example repo.
+
+The script sends the data as a json string of a list of records src_json{[{'x': 1, 'y': 2, ...}...]} which you can convert to a dataframe
+
+#+begin_src python
+raw_json_data = "[{'x': 1, 'y': 2, ...}...]"
+records = json.loads(raw_json_data)
+df = pd.DataFrame(records)
+# Sometimes you may want to set the type of the columns
+df.astype({'x': float, 'cut': object, ...})
+#+end_src
+
+You can also look at the scr/deployment/score.py for a more complete example of a scoring script that you can use.
+
 ** Optional: Arguments and environment variables
-Let's go on a little tangent. Environment variables are a convinient way to control your application without having to change how you call it. E.g., say you want to use a different experiment-name when developing and testing ML pipelines, compared to when it is employed.
+Let's go on a little tangent. Environment variables are a convinient way to control your application without having to change how you call it. E.g., say you want to use a different experiment-name when developing and testing ML pipelines, compared to when it is employed, then you can just change what you set the environment variables as.
 
 However, working with environment variables in Python can easily get annoying. Although it's  easy to access the value of an environment variable via the src_python{os.environ} dictionary.  it can quickly becomes messy and unclear for others using your code what variables can be set in your code, and what their purpose are.
 
@@ -173,7 +187,6 @@ except Exception:
 
 Since we will use this environments alot it might be a good idea to move this code-snippet into its own function, e.g., src_python{get_environment} in the utils module.
 
-
 * Defining the webservice
 So, we should now have a scoring script and an environment. We then create an inference config from this information, and then find the latest version of our model.
 
@@ -199,7 +212,11 @@ model = Model(workspace, name=env_vars.model_name, version=None)
 
 You can then build the webservice as a docker container and wait for it to finish
 #+begin_src python
-package = Model.package(workspace, models=[model], inference_config=inference_config)
+package = Model.package(
+    workspace,
+    models=[model],
+    inference_config=inference_config
+)
 package.wait_for_creation(show_output=True)
 # Print the location of the new docker image
 print(package.location)
@@ -219,11 +236,43 @@ Then, you can run the container on your local machine
 docker run <location-of-your-webservice> -p 6891:5001 --name my-cool-webservice
 #+end_src
 
-You can then call the model freely. TODO
+Note that if things crashes and you need to rebuild the container, it will not take as long to rebuild the container since the environment has already been created.
 
-* Deploying to Azure ML
+** Request script
+There is a utility script that you can use to send request to
 
-Defining a small kubernetes cluster is usually not a problem. If you have a free subscriptions, your vCPU quota is usually quite small, so we should limit ourselves to using a single node. Standard production clusters require a minimum of three nodes, so you should set the cluster purpose to DEV_TEST.
+
+
+* Azure ML Webservice
+Having a docker is a neat way to see what is going on under the hood. However, Azure ML offers a further abstraction in the form of WebServices. A webservice allows you to automatically deploy the docker we built in the previous step to a compute resource of your choice. It also handles things like authentication and load balancing.
+
+In order to test how a webservice performs, it is a good idea to perform a local deployment first. Instead of packaging the model, like we did in the previous step, we deploy the model. The only difference is that we provide a deployment configuration and a name for the service.
+
+The deployment configuration defines what kind of compute the model should run on. Since we want to run it locally, we can use the LocalWebservice class to create a local deployment configuration.
+
+#+begin_src python
+deployment_config = LocalWebservice.deploy_configuration(port=6789)
+#+end_src
+
+Then, we can create a deployment as the following
+#+begin_src python
+service = Model.deploy(
+    workspace=workspace,
+    name="<name-of-service>",
+    models=[model],
+    inference_config=inference_config,
+    deployment_config=deployment_config,
+    overwrite=True,
+    deployment_target=None
+)
+service.wait_for_deployment(show_output=True)
+#+end_src
+
+Setting deployment_target to None means that the service is started locally using Docker.
+
+
+* Deploying to Azure ML Compute
+However, if we want to make the model available to everyone, we need to deploy it to the cloud. Defining a small kubernetes cluster is fairly easy in Azure ML. If you have a free subscriptions, your vCPU quota is usually quite small, so we should limit ourselves to using a single node. Standard production clusters require a minimum of three nodes, so you should set the cluster purpose to DEV_TEST.
 
 Something like this should do the trick.
 #+begin_src python
@@ -263,9 +312,7 @@ service.wait_for_deployment(show_output=True)
 print(service.scoring_uri)
 #+end_src
 
-Running this script can take up to 10 minutes, with most of the time being spent setting up compute cluster. Since we reused our previous environment we don't have to rebuild the container.
-
-You can run the request script and change the call URI to the scoring URI of our new model.
+Running this script can take up to 10 minutes, with most of the time being spent setting up the compute cluster. Since we reused our previous package, we don't have to rebuild the container.
 
 * Final Thougths
-So far, we have created a very basic POC and we have already deployed it as a webservice running in "production". Your project can now be considered MLOps Level 0 compatible. The next step is now to move towards MLOps Level 1, by making our training automated the training. In the step after that, we will move towards running training in GitHub.
+So far, we have created a very basic POC and we have already deployed it as a webservice running in a mock production environment. Your little project can now be considered as being MLOps Level 0. The next step is now to move towards MLOps Level 1, by making our training automated. In the step after that, we will move towards running training in GitHub.
