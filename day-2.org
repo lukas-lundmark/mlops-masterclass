@@ -1,0 +1,6 @@
+#+title: Day 2
+#+author: luklun
+#+date: 2022-05-21
+
+** Day2 Part 1 - Managing Pipelines from GitHub
+We will then automate our training process by integrating it with GitHub Actions. You find the instructions [[./github-day-1.org][here]].
