@@ -136,49 +136,38 @@ pipeline.validate()
 
 pipeline_name = <some-good-pipeline-name>
 published_pipeline = pipeline.publish(pipeline_name)
+print(published_pipeline.id)
 #+end_src
 
 #+begin_src python
 python -m ml_pipelines.build_pipeline.py
 #+end_src
+Take note of the pipeline id which was printed, since it is needed.
 
 The pipeline object now exists as a callable object your workspace and can easily be executed whenever we see fit, regardless if the code change or not. We can then simply add a new orchestration script like this to invoke the pipeline with the newest version of the datasets we defined earlier.
 
 #+begin_src python
 # ml_pipelines/run_pipeline.py
 from azureml.core import Experiment
-from azureml.pipeline.core import Pipeline
+from azureml.pipeline.core import PublishedPipeline
 
 workspace = Workspace.from_config()
-pipeline = Pipeline.get(workspace, <pipeline-name>)
+pipeline = PublishedPipeline.get(workspace, id=<pipeline-id>)
 experiment = Experiment(workspace, <name-of-your-experiment>)
 experiment.submit(pipeline)
 #+end_src
 
-* Advanced ML Pipeline - Optional
-There are some more advanced options for how to build pipelines
-
-** Configuring Inputs
-Pipelines offer a different way of defining input data. You can define
+Tips: If you just want to run the latest version of a pipeline and you lost the id you can just get the list of all pipeline and filter by name, and then select the first in that list.
 
 #+begin_src python
-# ml_pipelines/build_pipeline.py
-train_dataset = Dataset.get_by_name(
-    workspace, "train-dataset"
-)
-test_dataset = Dataset.get_by_name(
-    workspace, "test-dataset"
-)
-train_ds_consumption = DatasetConsumptionConfig("train_ds", train_dataset)
-test_ds_consumption = DatasetConsumptionConfig("test_ds", test_dataset)
-inputs = [train_ds_consumption, test_ds_consumption]
+pipelines = PublishedPipeline.list(workspace)
+piplines = [p for p in pipelines where p.name == "<name-of-your-pipeline>"]
+pipeline = pipelines[0]
 #+end_src
-and add it to the PythonScriptStep.
 
-Then, instead of referencing the dataset by name in the training step, we use the input_datasets dictionary from the run. Other than that, things stay the same.
+
+* Advanced ML Pipeline - Pipeline Parameters
 #+begin_src python
-# src/train.py
-datasets = run.input_datasets
-train_dataset = datasets["train_ds"]
-test_dataset = datasets["test_ds"]
+
 #+end_src
+
