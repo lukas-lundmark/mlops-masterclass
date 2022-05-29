@@ -2,7 +2,7 @@
 Notebooks are perfect for rapid development, but they can be difficult to collaborate on, and hard to automate, making them ill-suited for MLOps. After having become familiar with the Azure ML basic, we are gonna convert our notebook to a simple training script that we will run both locally, and remotely.
 
 ** Setting up a non-interactive Run
-Create a directory called "src" in your repository. Create a single file called train.py there. Extract the necessary code from your notebook into the train.py file. It should connect to your Azure ML workspace, and download the necessary dataset, as you did before.
+Create a directory called "src" in your repository. Create a single file called ~train.py~ there. Extract the necessary code from your notebook into the train.py file. It should connect to your Azure ML workspace, and download the necessary dataset, as you did before.
 
 Make sure that you can run the script as src_bash{python src/train.py}
 and that it runs until completion, just like in your notebook.
@@ -29,8 +29,7 @@ run = experiment.submit(src)
 run.wait_for_completion(show_output=True)
 #+end_src
 
-Before we run this experiment, you need to modify *train.py* script with two simple changes.
-*Replace* the creation of the workspace, experiment, and the run in your script
+Before we run this experiment, you need to modify *train.py* script a little bit. Replace the creation of the workspace, experiment, and the run in your script
 #+begin_src python
 # src/train.py (old)
 ws = Workspace.from_config()
@@ -52,16 +51,16 @@ experiment = run.experiment
 workspace = run.experiment.workspace
 #+end_src
 
-This change is required because now the orchestration code is responsible for instantiating the run, and the script gets those objects from the Run context instead.
+This change is required because now the orchestration code is responsible for instantiating the run, and the script gets those objects from the Run context instead. Note that we also removed the src_python{run.complete(), since AML will now handle the ending the run.
 
-Execute the new orchestration code to start the run
+Execute the new orchestration code to start the run.
 #+begin_src bash
 python -m ml_pipelines.run_train_script.py
 #+end_src
-this should now start a new run in a Docker environment on your local machine. If you go to the Studio you should still see a new run having started on the experiment.
+This should start a new run in a Docker environment on your local machine. If you go to the Studio you should still see a new run having started on the experiment.
 
 ** Using AML Compute
-Now, we should look into how to allocate remote compute in Azure ML. A small CPU cluster is often enough for simple training scripts The following code
+Now, we will look into how to allocate compute resources in Azure ML. A small CPU cluster is often enough for these, very basic training scripts. Especially if you are using a free Azure subscription, since they put a strict limitation on the number of vCores you may use.
 
 #+begin_src python
 # ml_pipelines/run_train_script.py
@@ -78,32 +77,89 @@ except ComputeTargetException:
         idle_seconds_before_scaledown=1200, # Scale down after 20 minutes
     )
     cpu_cluster = ComputeTarget.create(ws, cpu_cluster_name, compute_config)
+    # This will block the script until the resource is created
+    cpu_cluster.wait_for_complete(show_output=True)
 #+end_src
+Note the usual creation pattern, with a try and except clause. We also block until the resource has been created, which takes up to five minutes.
 
-Add it as the compute_target for the ScriptRunConfig
+Set the new cpu_cluster as the compute_target for the ScriptRunConfig
 #+begin_src python
-src = ScriptRunConfig('src', script='train.py', environment=local_env, compute_target=cpu_cluster)
+# ml_pipelines/run_train_script.py
+src = ScriptRunConfig(
+    name='src',
+    script='train.py',
+    environment=local_env,
+    compute_target=cpu_cluster
+)
 #+end_src
 
-Run the orchestration code again. If you look at the *compute* section in the Studio, and under compute clusters, you should see that a new cluster is being created. This can take a couple of minutes. You can check the experiment section and see if a run has started. In the logs, you can start to see how the docker is being built, and how they run is started.
+Run the orchestration code again. If you look at the *compute* section in the Studio, and under compute clusters, you should see that a new cluster is being created. Then, you will see it starting to scale up from zero cores to one. This process can take a couple of minutes.
+
+After the compute resource has been created, you experiment will run. Before that, it will be queued. You can check the experiment section and see the status of the run. If you are feeling bored, you can inspect the logs of your run. You should start to see how the docker container that will exectute your code is being built.
+
+Note that it will take much quicker to run the experiment a second time. The environment will note have to be created again, and if you run the script before the cluster scales down it should start almost immediately.
+
+
+** Sending Arguments to the Script
+A lot of values in the original notebook, such as dataset and model names, where hard coded in the original notebook. This works okay in notebooks, since they are meant to be interactive and are easy to change. However, in scripts, we generally want such values to be modifiable using arguments. Python's default argparse module will suffice
+
+Write something like this to replace the hard coded values for the train and test dataset names
+#+begin_src python
+# scr/train.py
+import argparse
+
+parser = argparse.ArgumentParser("This")
+parser.add_argument('--train-dataset', default='diamond-train')
+parser.add_argument('--test-dataset', default='diamond-test')
+parser.add_argument('--model-name', default='diamond-regressor')
+args = paser.parse_args()
+
+train_ds = args.train_dataset
+test_ds = args.test_dataset
+model_name = args.model_name
+# ...
+#+end_src
+
+#+RESULTS:
+
+If you would run it locally, you would then invoke the script like this
+#+begin_src bash
+python src/train.py --model-name new-diamond-regressor
+#+end_src
+
+However, you can then update the ScriptRunConfig to take one or more arguments in the orchestration script when it submits the script.
+
+#+begin_src python
+# ml_pipelines/run_train_script.py
+src = ScriptRunConfig(
+    name='src',
+    script='train.py',
+    environment=local_env,
+    compute_target=cpu_cluster
+    arguments= ['--model-name', 'new-diamond-regressor']
+)
+#+end_src
+
+Run the orchestration script with a new value for the model. If you look at the Run in the studio you should be able to see exactly which values where provided to the script when it was invoked, another useful tool when reproducing earlier experiments. This should register a new model
+
+In the next section, we will
 
 * Convert your Notebook to an Azure ML Pipeline
-Scripts are nice, but it's a hassle to have to resubmit a new script everytime if we just want to run training again against e.g., some new data.  Pipelines allows us to keep a definition of one or more scripts in the cloud, which we can then invoke using new data.
+Scripts are nice, but it's a hassle having to resubmit a new script everytime if we just want to run the training multiple times.  Pipelines allows us to keep a definition of one or more scripts in the cloud, which we can then invoke either via the SDK, CLI, or via a REST call. It also allows us to break down our training logic into reusable components that we can use in multiple different pipelines.
 
-Azure ML Pipelines are a series of python scripts that runs in a given order. Each step can run on separate compute and in separate environments. For example, you can use a small cluster for data preprocessing, and then a GPU-enabled compute instance to train your large deep learning models, without incurring excessive cost.
+Azure ML Pipelines consists of a series of python scripts with a defined run order. Each step may run on separate compute and in separate environments. For example, you can use a small cluster for data preprocessing, and then a GPU-enabled compute instance to train your large deep learning models, without incurring excessive cost.
 
 However, they can be annoying to debug since they (for some reason) can't run on your local computer, and need to be submitted to Azure ML.
 
-Pipelines also allow us to use PipelineParameters, which can be set when calling a published pipeline. This is useful if you have training code that doesn't change much, but you regularly register a new dataset on which you want to retrain your model.
+Each PipelineStep is very similar to a ScriptRunConfigs, with some minor changes. Important to note, there is a slight difference in how Runs work in pipelines. The pipeline itself has it's own parent run, and each pipeline step is its own child run with its own run id. For convenience, it is nice to log metrics both in the child and the parent-run. Similarly, it is often better to register the model to the parent-run, rather than the child run, since it makes it easier to inspect the logs in the Studio. Get the parent run and replace the normal run.log with parent_run.log
 
-Pipelines are very similar to ScriptRunConfigs, with some minor changes. First, there is a slight difference in how Runs work in pipelines. The pipeline itself has a run each step is a child run with its own run id. For convenience, it is nice to log metrics both in the child and the parent-run. Similarly, it is often better to register the model to the parent-run, rather than the child run, since it makes it easier to inspect the logs in the Studio. Get the parent run and replace the normal run.log with parent_run.log
+For example
 #+begin_src python
-# src/train.py
-parent_run = run.parent
-parent_run.log(...)
+run.log('rmse', rmse)
+run.parent.log('rmse', rmse)
 #+end_src
 
-Then, create a new orchestration script ml_pipelines/build_pipeline.py and copy the contents of the run_train_script. Replace the script config definition in the build_pipeline file.
+Create a new orchestration script ml_pipelines/build_pipeline.py and copy the contents of the current run_train_script. Replace the script config definition in the build_pipeline file.
 #+begin_src python
 # ml_pipelines/build_pipeline.py (old)
 from azureml.core import ScriptRunConfig
@@ -132,7 +188,7 @@ train_step = PythonScriptStep(
 pipeline = Pipeline(
     workspace=workspace, steps=[train_step], description="Model Training and Deployment"
 )
-pipeline.validate()
+pipeline.validate() # Make sure the pipeline is functioning
 
 pipeline_name = <some-good-pipeline-name>
 published_pipeline = pipeline.publish(pipeline_name)
@@ -142,9 +198,10 @@ print(published_pipeline.id)
 #+begin_src python
 python -m ml_pipelines.build_pipeline.py
 #+end_src
-Take note of the pipeline id which was printed, since it is needed.
 
-The pipeline object now exists as a callable object your workspace and can easily be executed whenever we see fit, regardless if the code change or not. We can then simply add a new orchestration script like this to invoke the pipeline with the newest version of the datasets we defined earlier.
+Take note of the pipeline id which was printed, since it is needed to identify the pipeline in the cloud (you can also look in the Studio under the Pipeline page and see if a new pipeline was registered).
+
+The pipeline object now exists as a callable object your workspace and can easily be executed whenever we see fit, regardless if the code change or not. We can then create a new orchestration script like this to invoke the pipeline with the newest version of the datasets we defined earlier.
 
 #+begin_src python
 # ml_pipelines/run_pipeline.py
@@ -167,7 +224,29 @@ pipeline = pipelines[0]
 
 
 * Advanced ML Pipeline - Pipeline Parameters
-#+begin_src python
+ Pipelines have a utility called PipelineParameters, which is a way to dynamically change the arguments given to each pipeline step when invokes. If a PipelineStep takes a PipelineParameter as input, the parameter becomes part of the Pipeline Defintion, and can be set when the pipeline is invoked.
 
+A parameter is defined like this
+#+begin_src  python
+parameter = PipelineParameter('my-param', default_value=1)
+step = PythonScriptStep(name="step", script_name="step.py", arguments=['--arg', parameter], ...)
+
+pipeline = Pipeline(ws, steps=[step])
+pipeline.validate()
+published_pipeline = pipeline.publish('my-pipeline')#+end_src
 #+end_src
 
+You can then change the PipelineParameter value like this
+#+begin_src python
+run = experiment.submit(published_pipeline, pipeline_parameters={'my-param': 2})
+status = run.wait_for_completion(show_output=True)
+#+end_src
+Or by using REST
+#+begin_src python
+import requests
+response = requests.post(
+    published_pipeline1.endpoint,
+    json={"ExperimentName": "some-experiment",
+        "ParameterAssignments": {"my-param": 2}}
+)
+#+end_src

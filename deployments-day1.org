@@ -130,12 +130,12 @@ df.astype({'x': float, 'cut': object, ...})
 
 You can also look at the scr/deployment/score.py for a more complete example of a scoring script that you can use.
 
-** Optional: Arguments and environment variables
+** Arguments and environment variables
 Let's go on a little tangent. Environment variables are a convinient way to control your application without having to change how you call it. E.g., say you want to use a different experiment-name when developing and testing ML pipelines, compared to when it is employed, then you can just change what you set the environment variables as.
 
-However, working with environment variables in Python can easily get annoying. Although it's  easy to access the value of an environment variable via the src_python{os.environ} dictionary.  it can quickly becomes messy and unclear for others using your code what variables can be set in your code, and what their purpose are.
+However, working with environment variables in Python can easily get annoying. Although one can access any environment variable using the src_python{os.environ} dictionary it quickly becomes messy and unclear for others using your code what variables can or needs to be set for your code to run, and what their purpose are.
 
-A more well-structured method is to use a combination of python-classes and the package python-dotenv. The src_python{load_dotenv}  function in module dotenv will look for a file named .env in your current working directory and load the environment variable definitions in it. If it can't find any, it will do nothing. You can create a .env file with content like, setting those environment variables you want
+A more well-structured method is to use a combination of python-classes and the package python-dotenv to manage variables. The src_python{load_dotenv}  function in the module dotenv will look for a file named .env in your current working directory and load the environment variable definitions in it. If it can't find any, it will do nothing. You can create a .env file with content like, setting those environment variables you want
 
 #+begin_src bash
 # ./.env
@@ -143,7 +143,9 @@ VARIABLE_NAME1="variable-value"
 VARIABLE_NAME2="variable-value2"
 #+end_src
 
-Wrapping the call to load_dotenv and the loading of the variables within a class creates a single point of truth where all relevant variables are defined (and optionally documented). It can look like this:
+See the [[https://github.com/lukas-lundmark/mlops-example/blob/main/.env.example][.env.example]] in the example repo
+
+By wrapping a call to load_dotenv and the subsequent loading of the variables within a class creates a single point of truth where all relevant variables are defined (and optionally documented). It can look like this:
 
 #+begin_src python
 # ml_pipelines/utils.py
@@ -162,13 +164,25 @@ class EnvironmentVariables:
 
 #+end_src
 
-Create a file called utils.py in your ml_pipelines folder and create a class like this. You can then use it in your orchestration script and get access to the relevant variables. If you want some suggestsion on useful variables to use see the example class in the [[https://github.com/lukas-lundmark/mlops-example/blob/main/ml_pipelines/utils.py][example repository]] or the [[https://github.com/microsoft/MLOpsPython/blob/master/ml_service/util/env_variables.py][Microsoft's Azure ML MLOps directory]].
+Create a file called utils.py in your ml_pipelines folder and create a class like this. Variables that are good to define are:
+- model name
+- experiment name
+- environment name
+- service name
+- aks-cluster name
+- script directory
+- scoring file
+- train and test dataset names
+- conda file
 
+If you want some inspiration you can see the example class in the [[https://github.com/lukas-lundmark/mlops-example/blob/main/ml_pipelines/utils.py][example repository]] or the [[https://github.com/microsoft/MLOpsPython/blob/master/ml_service/util/env_variables.py][Microsoft's Azure ML MLOps directory]].
+
+You can then use the ~EnvironmentVariables~ class in your orchestration script to get quick access to the relevant variables.
 #+begin_src python
 from ml_pipelines.utils import EnvironmentVariables
 
 # Load relevant environment variables
-env_vars = EnvironmentVaribles()
+env_vars = EnvironmentVariables()
 # ...
 model = Model(workspace, name=env_vars.model_name)
 experiment = Experiment(workspace, name=env_vars.experiment_name)
@@ -196,12 +210,13 @@ except Exception:
     )
 #+end_src
 
-Since we will use this environments alot it might be a good idea to move this code-snippet into its own function, e.g., src_python{get_environment} in the utils module.
+Since we will use this environments alot it might be a good idea to move this code-snippet into its own function, e.g., src_python{get_environment} in the utils module. Let is take a EnvironmentVariables parameter such that we can easily configure environment name using the .env file.
 
 * Defining the webservice
 So, we should now have a scoring script and an environment. We then create an inference config from this information, and then find the latest version of our model.
 
 #+begin_src python
+# ml_pipeline/build_service.py
 from azureml.core import Workspace, Model
 from azureml.core.model import InferenceConfig
 from ml_pipelines.utils import EnvironmentVariables, get_environment
@@ -218,8 +233,6 @@ inference_config = InferenceConfig(
 # Will return the latest model version
 model = Model(workspace, name=env_vars.model_name, version=None)
 #+end_src
-
-#+RESULTS:
 
 You can then build the webservice as a docker container and wait for it to finish
 #+begin_src python
@@ -250,7 +263,7 @@ docker run <location-of-your-webservice> -p 6891:5001 --name my-cool-webservice
 Note that if things crashes and you need to rebuild the container, it will not take as long to rebuild the container since the environment has already been created.
 
 ** Request script
-There is a utility script that you can use to send request to
+There is a utility script ~send_request~ that you can use to send request to a URL.
 
 
 
@@ -262,6 +275,8 @@ In order to test how a webservice performs, it is a good idea to perform a local
 The deployment configuration defines what kind of compute the model should run on. Since we want to run it locally, we can use the LocalWebservice class to create a local deployment configuration.
 
 #+begin_src python
+from azureml.core.webservice import LocalWebservice
+# ...
 deployment_config = LocalWebservice.deploy_configuration(port=6789)
 #+end_src
 
@@ -279,22 +294,23 @@ service = Model.deploy(
 service.wait_for_deployment(show_output=True)
 #+end_src
 
-Setting deployment_target to None means that the service is started locally using Docker.
-
-
 * Deploying to Azure ML Compute
 However, if we want to make the model available to everyone, we need to deploy it to the cloud. Defining a small kubernetes cluster is fairly easy in Azure ML. If you have a free subscriptions, your vCPU quota is usually quite small, so we should limit ourselves to using a single node. Standard production clusters require a minimum of three nodes, so you should set the cluster purpose to DEV_TEST.
 
 Something like this should do the trick.
 #+begin_src python
+from azureml.core.compute import ComputeTarget, AksCompute
+from azureml.core.compute_target import ComputeTargetException
+# ...
+
 inference_cluster_name = "my-aks"
 try:
     aks_target = AksCompute(workspace, name=inference_cluster_name)
 except ComputeTargetException:
     provisioning_config = AksCompute.provisioning_configuration(
-        vm_size='Standard_D2as_v4',
+        vm_size='Standard_D2as_v4', # The smallest size
         agent_count = 1,
-        cluster_purpose = AksCompute.ClusterPurpose.DEV_TEST
+        cluster_purpose = AksCompute.ClusterPurpose.DEV_TEST # Needed for having less than three nodes
     )
     aks_target = ComputeTarget.create(
         workspace = workspace,
@@ -303,11 +319,14 @@ except ComputeTargetException:
     )
     aks_target.wait_for_completion(show_output = True)
 #+end_src
+(This function fits well in the util.py file we created earlier.)
 
 Then, instead of packaging the model like we did before, we define a Kubernetes Weservice configuration and deploy our model.
 
 #+begin_src python
-model = Model(workspace, name=env_vars.model_name, version=args.model_version)
+from azureml.core.webservice import AksWebservice
+# ...
+model = Model(workspace, name=env_vars.model_name)
 deployment_config = AksWebservice.deploy_configuration(cpu_cores = 1, memory_gb = 1)
 
 service = Model.deploy(
@@ -320,13 +339,13 @@ service = Model.deploy(
     deployment_target=aks_target
 )
 service.wait_for_deployment(show_output=True)
-print(service.scoring_uri)
+print('uri', service.scoring_uri)
+print('key', service.get_keys()[0])
 #+end_src
 
 Running this script can take up to 10 minutes, with most of the time being spent setting up the compute cluster. Since we reused our previous package, we don't have to rebuild the container.
 
-
-
+Use the uri and key to send some test request to your new service. If you lost them you can always see them in the studio.
 
 * Final Thougths
 So far, we have created a very basic POC and we have already deployed it as a webservice running in a mock production environment. Your little project can now be considered as being MLOps Level 0. The next step is now to move towards MLOps Level 1, by making our training automated. In the step after that, we will move towards running training in GitHub.
