@@ -1,5 +1,5 @@
 * Day 2 instructions
-In day two we will start to look at how we can use GitHub actions to CI/CD/CT of our model.
+We will start to look at how we can use GitHub Actions to (semi) automatically get CI/CD/CT of our model.
 
 ** Day2 Part 1 - Setting up GitHub action for controlling Azure ML
 We need to configure GitHub Actions to execute our orchestration scripts. We will first make it so we can automatically build a custom runner for our workflows. We will then connect GitHub actions to our Azure ML workspace using a Service Principle and GitHub secrets. You find the instructions [[./github-day-1.org][here]].
