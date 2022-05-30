@@ -6,46 +6,27 @@
 Before you start you might want to read a small introduction of [[./mlops.org][MLOps.]]
 
 ** Preparing for the Workshop / Masterclass
+
+*** Template Repository
+There exist a template repository that you should use to create your MLOps repository. It is very bare-bones, only containing files for inializing python and downloading data.
+
+Go to https://github.com/lukas-lundmark/mlops-template and click on *Use this template*. Create a new repo for your own user with a suitable name. Then, clone the repo to your local computer and follow the instructions in the README for how to prepare your development environment.
+
 *** Example Code
-We frequently reference this [[https://github.com/lukas-lundmark/mlops-example][example repository]]. This repo serves two purposes. First, we will copy some files from it to use as the base for our own project. Second, it will act as a reference for syntax and tricks for how thing may be implemented, if you feel unsure. Before you start the workshop you might want to clone a local copy of this repo.
+We will frequently refer to example code in the [[https://github.com/lukas-lundmark/mlops-example][example repository]]. This repo acts as a reference for how things *may* be implemented, if you feel unsure how things should be done. Before you start the workshop you might want to clone a local copy of this repo as well.
 
 *** Data
-We will use the commonly used Diamond dataset in our experiments. You can find a training and test split of the dataset in the [[https://drive.google.com/drive/u/0/folders/1PDvZxc88wZbiO_Kpwmc8ZPPgDdhwj_cc][Google Drive]].
-
-*** Tools and Utilities
-
-**** Python
-Python is the go-to tool for everything Data Science. To have an easier time developing, it is important to have a good setup with all the required dependencies.
-
-Read the [[./setup-python.org][instructions]] for how to prepare the python environment (Special insturctions for M1 machines can be found [[./m1.org][here]])
-
-**** Docker
-Docker will be used frequently to build environments for both local and remote execution. Read a Docker Introduction and installation information [[./docker.org][here]].
-
-**** Azure and Azure ML
-Azure ML is one of many ML-as-a-Service offerings that exist on the market. There is nothing unique about it, but it allows us to manage almost every step of the model life-cycle using a single, and consistent API, which makes it good for learning.
-
-Instructions for how to get started with Azure and Azure ML can be found [[./setup-azure.org][here]].
-
-**** GitHub
-We will use GitHub as our Code Repository and GitHub Actions as our CI/CD environment. You can create a new GitHub account for free, or use the GitHub account you use for your Solita work. The things in GitHub Actions works for all versions of GitHub, so it doesn't matter which account you use.
-
-You can read a basic introduction to GitHub Actions [[./github-info.org][here]].
-
-**** Command Line
-We will make some use of the command line, but will mostly rely on python. Most CLI commands, such as docker commands, in the examples should work on both Windows CMD and Unix shells. However, I have no Windows machine to access so I can't verify that all commands have a windows equivalent.
+We will use the commonly used Diamond dataset in our experiments. It's a small dataset that is easy to train, but it serves our purposes for now. You can find the training and test split of the dataset in the [[https://drive.google.com/drive/u/0/folders/1PDvZxc88wZbiO_Kpwmc8ZPPgDdhwj_cc][Google Drive]] or you can use the download-data.sh script in the template repo.
 
 * Day 1 Instructions
 
-Day 1 Presentation can be found [[https://docs.google.com/presentation/d/1NFbbvjmwhlM5d4xiPC8n6wXoMj9552jhWzCr8yJVTmg/edit?usp=sharing][here]]
-Data for the workshop can be found here
-Example Repo with Code examples can be found here
+Presentations for day 1 can be found [[https://docs.google.com/presentation/d/1NFbbvjmwhlM5d4xiPC8n6wXoMj9552jhWzCr8yJVTmg/edit?usp=sharing][here]]
 
 ** Day1 Part 1 - Getting Started with Azure ML
-We will start by converting an existing, local experiment to using proper experiment tracking in the cloud using [[./azureml-info.org][Azure ML]]. You find the instructions [[./azureml-day-1.org][here]].
+We will start by converting an existing, local experiment to having proper experiment tracking in the cloud using [[./azureml-info.org][Azure ML]]. You find the instructions [[./azureml-day-1.org][here]].
 
 ** Day1 Part 2 - Deploying a Model
-We go through common ways to deploy models and play around with local and cloud deployment in Azure ML. You find the instructions [[./deployments-day1.org][here]].
+We will go through common ways to deploy models and play around with local and cloud deployment in Azure ML. You find the instructions [[./deployments-day1.org][here]].
 
 ** Day1 Part 3 - From Notebooks to Pipelines
-We convert our notebook to a training script and an ML pipeline that we run on remote compute. You find the instructions [[./azureml-pipelines.org][here]].
+We will convert our notebook to a training script and then later an ML pipeline that we will run on remote compute. You find the instructions [[./azureml-pipelines.org][here]].
