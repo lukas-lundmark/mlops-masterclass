@@ -62,7 +62,7 @@ az account set -s <subscriptionId>
 Similarly, you can set the default resource group and default workspace name
 #+begin_src bash
 az configure -–defaults group='<resource-group-name>'
-az configure --defaults workspace='<workspace-Name>'
+az configure --defaults workspace='<workspace-name>'
 #+end_src
 
 Check that you can run this command without any errors. Should output an empty list since you don't have any models yet.
