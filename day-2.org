@@ -1,6 +1,17 @@
-#+title: Day 2
-#+author: luklun
-#+date: 2022-05-21
+* Day 2 instructions
+In day two we will start to look at how we can use GitHub actions to CI/CD/CT of our model.
 
-** Day2 Part 1 - Managing Pipelines from GitHub
-We will then automate our training process by integrating it with GitHub Actions. You find the instructions [[./github-day-1.org][here]].
+** Day2 Part 1 - Setting up GitHub action for controlling Azure ML
+We need to configure GitHub Actions to execute our orchestration scripts. We will first make it so we can automatically build a custom runner for our workflows. We will then connect GitHub actions to our Azure ML workspace using a Service Principle and GitHub secrets. You find the instructions [[./github-day-1.org][here]].
+
+** Day 2 Part 2 - Continuous Training
+We create workflows that runs the training pipeline. We will modify our existing pipeline as to register build information when training models and will use this to automatically deploy a new version of the web service if the model was updated. You find the instructions here.
+
+** Day 2 Part 3 Coninuous Deployment
+We will add workflows as to run a smoke test of a new deployment whenever the code for the webservice changes or a new model is registered. We then update the existing webservice if the new webservice completes the tests succesfully. You find the instructions here.
+
+** Day 2 Part 4 - Continuous Integration
+Cotninuous Integration in this case means updating our published pipeline when there are changes to the code. In order to garantuee correctness, we want to make sure that we don't publish a subpar pipeline that doesn't improve or prouces worse results. You find the instructions here.
+
+** No Continuous Monitoring?
+Maybe in day 3.
