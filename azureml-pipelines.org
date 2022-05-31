@@ -127,7 +127,7 @@ If you would run it locally, you would then invoke the script like this
 python src/train.py --model-name new-diamond-regressor
 #+end_src
 
-However, you can then update the ScriptRunConfig to take one or more arguments in the orchestration script when it submits the script.
+Similarly, you can update the ScriptRunConfig to take one or more arguments in the orchestration script.
 
 #+begin_src python
 # ml_pipelines/run_train_script.py
@@ -139,10 +139,11 @@ src = ScriptRunConfig(
     arguments= ['--model-name', 'new-diamond-regressor']
 )
 #+end_src
+This is a good place to use environment variables to make it so we can dynamically change the name of the model or datasets by merely changin the values in our ~.env~.
 
-Run the orchestration script with a new value for the model. If you look at the Run in the studio you should be able to see exactly which values where provided to the script when it was invoked, another useful tool when reproducing earlier experiments. This should register a new model
+Finish this new the orchestration script with a new value for the model. If you look at the Run in the studio you should be able to see exactly which values where provided to the script when it was invoked, another useful tool when reproducing earlier experiments. This should register a new model
 
-In the next section, we will
+In the next section, we will convert this single script to persistant pipeline that we can invoke without having to resubmit new code each time.
 
 * Convert your Notebook to an Azure ML Pipeline
 Scripts are nice, but it's a hassle having to resubmit a new script everytime if we just want to run the training multiple times.  Pipelines allows us to keep a definition of one or more scripts in the cloud, which we can then invoke either via the SDK, CLI, or via a REST call. It also allows us to break down our training logic into reusable components that we can use in multiple different pipelines.
@@ -169,7 +170,7 @@ run = experiment.submit(src)
 run.wait_for_completion(show_output=True)
 #+end_src
 
-to a Python Script Step and a pipeline
+to a Python Script Step and a pipeline. If you defined some arguments earlier you can add them as well.
 #+begin_src python
 # ml_pipelines/build_pipeline.py (new)
 run_config = RunConfiguration()
@@ -182,7 +183,8 @@ train_step = PythonScriptStep(
     source_directory="src",
     compute_target=cpu_cluster,
     runconfig=run_config,
-    allow_reuse=False
+    allow_reuse=False,
+    # arguments = [...]
 )
 
 pipeline = Pipeline(
@@ -201,7 +203,7 @@ python -m ml_pipelines.build_pipeline.py
 
 Take note of the pipeline id which was printed, since it is needed to identify the pipeline in the cloud (you can also look in the Studio under the Pipeline page and see if a new pipeline was registered).
 
-The pipeline object now exists as a callable object your workspace and can easily be executed whenever we see fit, regardless if the code change or not. We can then create a new orchestration script like this to invoke the pipeline with the newest version of the datasets we defined earlier.
+The pipeline object now exists as a callable object your workspace and can easily be executed whenever we see fit, regardless if the code change or not. We can then create a new orchestration script ~ml_pipelines/run_pipeline.py~ that will pipeline invoke the pipeline
 
 #+begin_src python
 # ml_pipelines/run_pipeline.py
@@ -211,7 +213,9 @@ from azureml.pipeline.core import PublishedPipeline
 workspace = Workspace.from_config()
 pipeline = PublishedPipeline.get(workspace, id=<pipeline-id>)
 experiment = Experiment(workspace, <name-of-your-experiment>)
-experiment.submit(pipeline)
+run = experiment.submit(pipeline)
+status = run.wait_for_completion(show_output=True)
+print(status) # Should say finished
 #+end_src
 
 Tips: If you just want to run the latest version of a pipeline and you lost the id you can just get the list of all pipeline and filter by name, and then select the first in that list.
@@ -222,13 +226,21 @@ piplines = [p for p in pipelines where p.name == "<name-of-your-pipeline>"]
 pipeline = pipelines[0]
 #+end_src
 
+* Pipeline Parameter
+One problem with our current pipeline is that we have no means to change how we invoke it. Everytime we call it will just run the same set of steps, producing the same results (except if we uplaod a new version of the dataset). But what if we wanted to change the name of the model we produce, or download a different dataset. How could we do that without having to submit a new pipeline, which was the whole point of using pipelines in the first place. Fortunently, pipelines have a utility called PipelineParameters, which is a way to dynamically change the arguments given the different script when invoked. And a PipelineStep takes a PipelineParameter as input, the parameter becomes part of the Pipeline Defintion, and can be set when the pipeline is invoked.
 
-* Advanced ML Pipeline - Pipeline Parameters
- Pipelines have a utility called PipelineParameters, which is a way to dynamically change the arguments given to each pipeline step when invokes. If a PipelineStep takes a PipelineParameter as input, the parameter becomes part of the Pipeline Defintion, and can be set when the pipeline is invoked.
+Say that you have a script that take a parameter named ~arg~
+#+begin_src python
+parser = argparse.ArgumentParser()
+parser.add_argument('--arg', default=None)
+args = parser.parse_args()
+print(args.arg)
+#...
+#+end_src
 
 A parameter is defined like this
 #+begin_src  python
-parameter = PipelineParameter('my-param', default_value=1)
+parameter = PipelineParameter('my-arg', default_value=1)
 step = PythonScriptStep(name="step", script_name="step.py", arguments=['--arg', parameter], ...)
 
 pipeline = Pipeline(ws, steps=[step])
@@ -238,7 +250,7 @@ published_pipeline = pipeline.publish('my-pipeline')#+end_src
 
 You can then change the PipelineParameter value like this
 #+begin_src python
-run = experiment.submit(published_pipeline, pipeline_parameters={'my-param': 2})
+run = experiment.submit(published_pipeline, pipeline_parameters={'my-arg': 2})
 status = run.wait_for_completion(show_output=True)
 #+end_src
 Or by using REST
@@ -247,6 +259,59 @@ import requests
 response = requests.post(
     published_pipeline1.endpoint,
     json={"ExperimentName": "some-experiment",
-        "ParameterAssignments": {"my-param": 2}}
+        "ParameterAssignments": {"my-arg": 2}}
 )
 #+end_src
+
+As a final excerice, modify you pipeline_build script to add pipeline arguments that can change the name of the model. Then, modify the run_pipeline script to take the model name as an optional parameter, which it then provides as a pipeline parameter when invoking the pipeline. This might seem quite basic, but it will be useful in the next day of the workshop, when we want to configure the pipeline to run certain checks given certain conditions.
+
+
+* Optional Section
+If you have come this far and still have some time left to kill, you can dive deeper into some more advanced pipeline topics
+
+** Pipeline Endpoint
+Having to keep track pipeline IDs quickly becomes annoying. Named Pipeline Endpoints offer a consistent endpoint that you can use to invoke your latest pipeline. You set your latest pipeline as the endpoint's default and simply call the endpoint as you would any other pipeline. You can then change the default pipeline of the endpoint whenever you build a new pipeline, and still invoke it the same way.
+
+You can create/update a pipeline endpoint using a simple script, like this
+#+begin_src python
+# ml_pipelines/set_endpoint.py
+import argparse
+from azureml.pipeline.core import PublishedPipeline, PipelineEndpoint
+from azureml.core import Workspace
+from ml_pipelines.utils import EnvironmentVariables
+
+ws = Workspace.from_config()
+env_vars = EnvironmentVariables()
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--pipeline-id", required=True, help="Published Pipeline to invoke")
+arguments = parser.parse_args()
+
+published_pipeline = PublishedPipeline.get(ws, id=arguments.pipeline_id)
+try:
+    pipeline_endpoint = PipelineEndpoint.get(ws, name=env_vars.pipeline_endpoint_name)
+    pipeline_endpoint.add_default(published_pipeline)
+except Exception:
+    pipeline_endpoint = PipelineEndpoint.publish(
+        workspace=ws,
+        name=env_vars.pipeline_endpoint_name,
+        pipeline=published_pipeline,
+        description="Pipeline Endpoint for Departure Prediction",
+    )
+#+end_src
+
+then you change your run script to use the endpoint instead of the pipeline
+#+begin_src python
+from azureml.pipeline.core import  PipelineEndpoint
+# ..
+published_pipeline = PipelineEndpoint.get(ws, name=env_vars.pipeline_endpoint_name)
+experiment = Experiment(ws, env_vars.experiment_name)
+run = experiment.submit(published_pipeline, pipeline_parameters=pipeline_parameters)
+status = run.wait_for_completion(show_output=True)
+print(status)
+#+end_src
+
+** More Advanced Pipelines
+The current pipeline is embarrassingly simple, merely consisting of a single step. As our project matures, we should start to break up the training script into smaller sub-scripts, such that they can be reused in other pipelines or by other members of the project. Maybe one script to check if we have new data to train on, one script to clean the data, and so forth.
+
+If you want an example of how your can create more (read overly) complex pipelines with different steps, you can look at the ~complex_pipeline~ in the example repo. You find the script definitions [[https://github.com/lukas-lundmark/mlops-example/tree/main/src/complex_pipeline][here]], and the various orchestration scripts [[https://github.com/lukas-lundmark/mlops-example/tree/main/ml_pipelines/complex_pipeline][here]].
