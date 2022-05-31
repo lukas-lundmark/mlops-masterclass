@@ -238,6 +238,12 @@ package.save("./imagefiles")
 
 To help you get started, there already exists basic packaging script in ~ml_pipelines/deploy/package_service.py~ that will package this dummy scoring script for you (without an ml model). Run it and follow the instructions. The first time it might take a while to create the environment, but later builds should more or less be instant. If you followed the instructions you should have a webservice running locally in a docker that you built yourself. This a good method for when you want to debug your scoring script wihtout having to push new images to your container registry everyt time.
 
+Run it as a python module from the repo's root directory so that the src_python{from ml_pipelines.utils ...} imports works
+#+begin_src bash
+python -m ml_pipelines.deploy.package_service
+#+end_src
+A tip is to do this for all the scripts in ml_pipelines.
+
 You goal now should be to configure the scoring script and the package script, such that you download your registered model and make it take requests. You can also look at the scr/deployment/score.py in the example repo for a more complete example of a scoring script if you feel lost.
 
 Note: you might be asked to login to your azure container registry in the azure CLI.
