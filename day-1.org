@@ -16,7 +16,7 @@ Go to https://github.com/lukas-lundmark/mlops-template and click on *Use this te
 We will frequently refer to example code in the [[https://github.com/lukas-lundmark/mlops-example][example repository]]. This repo acts as a reference for how things *may* be implemented, if you feel unsure how things should be done. Before you start the workshop you might want to clone a local copy of this repo as well.
 
 *** Data
-We will use the commonly used Diamond dataset in our experiments. It's a small dataset that is easy to train, but it serves our purposes for now. You can find the training and test split of the dataset in the [[https://drive.google.com/drive/u/0/folders/1PDvZxc88wZbiO_Kpwmc8ZPPgDdhwj_cc][Google Drive]] or you can use the download-data.sh script in the template repo.
+We will use the commonly used Diamond dataset in our experiments. It's a small dataset that is easy to train on, but it will serve our purposes for now. You can find the training and test split of the dataset in the [[https://drive.google.com/drive/u/0/folders/1PDvZxc88wZbiO_Kpwmc8ZPPgDdhwj_cc][Google Drive]] or you can use the download-data.sh script in the template repo.
 
 * Day 1 Instructions
 
@@ -29,4 +29,4 @@ We will start by converting an existing, local experiment to having proper exper
 We will go through common ways to deploy models and play around with local and cloud deployment in Azure ML. You find the instructions [[./deployments-day1.org][here]].
 
 ** Day1 Part 3 - From Notebooks to Pipelines
-We will convert our notebook to a training script and then later an ML pipeline that we will run on remote compute. You find the instructions [[./azureml-pipelines.org][here]].
+We will convert our notebook to a training script and then later to an ML pipeline that we will run on remote compute. You find the instructions [[./azureml-pipelines.org][here]].
