@@ -8,12 +8,12 @@ Before you start you might want to read a small introduction of [[./mlops.org][M
 ** Preparing for the Workshop / Masterclass
 
 *** Template Repository
-There exist a template repository that you should use to create your MLOps repository. It is very bare-bones, only containing files for inializing python and downloading data.
+There exist a template repository that you should use to create your MLOps repository. It is very bare-bones, only containing files for initializing python and downloading data.
 
-Go to https://github.com/lukas-lundmark/mlops-template and click on *Use this template*. Create a new repo for your own user with a suitable name. Then, clone the repo to your local computer and follow the instructions in the README for how to prepare your development environment.
+Go to https://github.com/lukas-lundmark/mlops-template and click on *Use this template*. Create a new repo for your user with a suitable name. Then, clone the repo to your local computer and follow the instructions in the README for how to prepare your development environment.
 
 *** Example Code
-We will frequently refer to example code in the [[https://github.com/lukas-lundmark/mlops-example][example repository]]. This repo acts as a reference for how things *may* be implemented, if you feel unsure how things should be done. Before you start the workshop you might want to clone a local copy of this repo as well.
+We will frequently refer to the example code in the [[https://github.com/lukas-lundmark/mlops-example][example repository]]. This repo acts as a reference for how things *may* be implemented if you feel unsure how things should be done. Before you start the workshop you might want to clone a local copy of this repo as well.
 
 *** Data
 We will use the commonly used Diamond dataset in our experiments. It's a small dataset that is easy to train on, but it will serve our purposes for now. You can find the training and test split of the dataset in the [[https://drive.google.com/drive/u/0/folders/1PDvZxc88wZbiO_Kpwmc8ZPPgDdhwj_cc][Google Drive]] or you can use the download-data.sh script in the template repo.

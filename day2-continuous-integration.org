@@ -1,0 +1,18 @@
+* Continuous Integration (of Pipelines)
+The final step before we have reached MLOps level 2 is to create continuous integration of pipelines.
+
+What scenarios exist where we want to update the pipeline. Well, our data scientist might have found a better way to represent certain features or is using a new machine-learning algorithm that improves performance. We want such features to be incorporated into the pipeline as quickly as possible.
+
+** Testing pipelines
+The most obvious test of a pipeline is to see if it can produce a new model that improves the result of the model.
+
+The most simple test is to check if the pipeline can run until completion and if it improves the result compared to earlier pipelines.
+
+This is also where pipeline endpoints become useful. We can create new pipelines based on new changes to the code, if that pipeline improves the result of our model, we can set that pipeline as the default in our endpoint. And then this pipeline will be triggered in all future continuous training calls. And if a pipeline doesn't improve results, we just disable it and forget about it.
+
+** Branches and Experiments
+There are a variety of different ways you can work with branches in an MLOps project. Since MLOps is heavily inspired by DevOps and CI/CD, it becomes quite natural to use so-called trunk-based development.
+
+The idea is just to have everyone commit either directly to the main branch, or use short-lived branches. Pull requests are used sparingly for branches that have not been merged lately. This is to prompt someone to review the code first. Otherwise, the principle is to trust developers and the CI/CD tools to catch and fix errors quickly, and only valid code should result in the deployment being updated.
+
+This makes it easy to satisfy the “everyone on the development team commits to trunk at least every 24 hours” requirement of continuous integration, and lays the foundation for the codebase to be releasable at any time, as is necessary for continuous delivery and continuous deployment.

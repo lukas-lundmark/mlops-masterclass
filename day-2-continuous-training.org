@@ -1,0 +1,40 @@
+* Continuous Training
+if you have finished the material from the previous day you should have a working pipeline available behind a pipeline endpoint. Our goal now is to create a workflow in GitHub that can trigger this pipeline based on certain events, such as changes in the data, and eventually, changes in the code.
+
+Since our system will be updated based on changes in both code, data, and other triggers, it is a good idea to let the repository and its CI/CD system drive those changes. It is entirely possible to run pipelines like this using e.g., Azure Data Factory, but this code-driven approach is, in my opinion, easier to manage.
+
+The goal is now fairly simple. We want to invoke our training pipeline.
+
+** When should we do automatic retraining?
+If we haven't made any changes to the code, what could the benefit of running the training pipeline be? Retraining should be done when we have some new data, this can either be because we have gathered some new data, and we want to see if the new data can help improve results.
+Or, it can be because we observe that the data starting to drift.
+
+
+*** New Training Data
+We can try to improve results by gathering new data. Depending on the setting, the data might require some manual labeling, or the labeling might come automatically later on. In the case of diamond prices, the price label would arrive automatically after the diamond in questsion has been sold. This means that after a while, we can start to extend the training dataset, and when we do that, we want the automatic pipeline to be triggered.
+
+*** Data Drift
+If we start to detect data drift, we want to retrain our model when new training and testing datasets har been gathered from the new data distribution. One problem here is that it starts to become difficult to compare older models' performance with new models, since we have changed the dataset we evaluate on.
+
+There are a few options for doing this (although I don't think that Azure ML provides any convenient way of doing this).
+We can either decide to let a model be evaluated on a new dataset pass by default, this is the easiest but maybe not the most optimal way, since the new model might not improve results at all. Another is to re-evaluate the old model first on the new dataset and see if the new model improves results compared to that
+
+
+* What to do?
+Add a guard that prevents the AML pipeline from running if no new data is registered. The easiest way to do this is with a script, so that is my recommendation. But you can also create another pipeline step for that, you can see an example.
+
+In a real setting, we would have an automatic script that uploads the data, and then Azure ML would trigger an event. However, this requires a complex setup with Azure Functions. Here, we will use repository dispatch events to trigger the retraining instead. Not optimal, but it works.
+
+** Updating the dataset
+We will update the training dataset with some new data, and see if this improves performance. In google drive, there are a few more records that we haven't used so far. We will create a new extended dataset containing this data, and then trigger retraining of our model.
+
+
+* Events that trigger workflows
+** repository_dispatch
+Repository dispatch is a way to
+
+** workflow_dispatch
+
+
+** Cron Jobs
+Cron Jobs (Cron is short for Cronos, the Greek God of time. It's an old Unix term for jobs that run on a fixed schedule.) One option is to have a cron job defined that will try to rerun the pipeline every day and cancel if there is no change to the training data.

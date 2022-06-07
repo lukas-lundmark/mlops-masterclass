@@ -1,0 +1,51 @@
+* Continuous Deployment (of Models)
+In this section, we will start to look at how we can perform automatic deployment of new models, or automatically deploy new versions of our service.
+
+** Smoke Test
+To not deploy something that is broken, it is a good idea to do some very basic smoke test (a smoke test is a basic test to check that basic functionality works).
+
+In our case, a smoke test should create a temporary web service, see if it can respond to requests, and also, check if the responses have a sufficiently high performance.
+
+Checking the performance is important because while the service might work, there can be some issues with the data preprocessing that causes the model to spew out gibberish. So it's best to catch such problems early on.
+
+
+*** Implementing the smoke test
+Create a separate job for the smoke test that will run before the deployment update. Here we can reuse our previous orchestration script for creating deployment but with some new values for environment variables so we use a new AKS cluster and a unique service name.
+#+begin_src yaml
+- smoke-test
+  name: Test if new service works
+  env:
+    CLUSTER_NAME: smoke_test_cluster
+    SERVICE_NAME: service-name
+#+end_src
+
+There is a small utility script that can send requests to the service and evaluate the responses. Use that to test the service. If it works, we can destroy this service, and continue and update the old service.
+
+*** Testing your test
+Just for fun, see if you can prevent a bad service from being deployed.
+First, break your service completely by adding an exit() call in the init method. Commit and see what happens.
+
+Then, remove the exit call and add some large noise to the responses instead.
+
+Commit the changes and see what happens.
+
+***
+
+** Updating the Webservice
+Updating the web service is quite easy to do. If you use the same deploy_service script as before, the latest version of the model should already be downloaded by default. You just set src_python{overwrite=True} in the src_python{Model.deploy} call to overwrite the existing service, which should also be done already.
+
+It might be a good idea to add some tags to the service, such that we later can check which commit and workflow run created it.
+
+After you have updated the service, add some new tags to it
+#+begin_src python
+service.add_tags({'GITHUB_SHA': os.getenv("GITHUB_SHA"), "BUILD_ID": os.getenv("GITHUB_WORKFLOW")})
+#+end_src
+
+Trigger the entire pipeline again using the repo dispatch event or workflow dispatch event. See that all the smoke tests are cleared and that the new service is created. Check in the studio that the new services tags match the commit hash of the latest commit.
+
+*** Smoother Updates
+In this case, we just update the service, but this is not recommended in a more realistic scenario. Azure ML offers a service called Online Endpoints which uses Kubernetes Endpoints to manage multiple deployments simultaneously. This allows us to have multiple versions of the service running, which allows us to gradually incorporate the new version.
+
+This method is called Blue-Green Deployment and is quite common when deploying web services using CI/CD.
+
+It would be nice to incorporate this in future versions of the master class, but this is a bit difficult due to quota limitations on standard Azure accounts and restrictions in creating AKS clusters in the sandbox.
