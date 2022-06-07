@@ -5,13 +5,13 @@ We will start to look at how we can use GitHub Actions to (semi) automatically g
 We need to configure GitHub Actions to execute our orchestration scripts. We will first make it so we can automatically build a custom runner for our workflows. We will then connect GitHub actions to our Azure ML workspace using a Service Principle and GitHub secrets. You find the instructions [[./github-day-1.org][here]].
 
 ** Day 2 Part 2 - Continuous Training
-We create workflows that runs the training pipeline. We will modify our existing pipeline as to register build information when training models and will use this to automatically deploy a new version of the web service if the model was updated. You find the instructions here.
+We create workflows that runs the training pipeline. We will modify our existing pipeline as to register build information when training models and will use this to automatically deploy a new version of the web service if the model was updated. You find the instructions [[./day-2-continuous-training.org][here]].
 
-** Day 2 Part 3 Coninuous Deployment
-We will add workflows as to run a smoke test of a new deployment whenever the code for the webservice changes or a new model is registered. We then update the existing webservice if the new webservice completes the tests succesfully. You find the instructions here.
+** Day 2 Part 3 Continuous Deployment
+We will add workflows as to run a smoke test of a new deployment whenever the code for the webservice changes or a new model is registered. We then update the existing webservice if the new webservice completes the tests succesfully. You find the instructions [[./day2-continuous-deployment.org][here]].
 
 ** Day 2 Part 4 - Continuous Integration
-Cotninuous Integration in this case means updating our published pipeline when there are changes to the code. In order to garantuee correctness, we want to make sure that we don't publish a subpar pipeline that doesn't improve or prouces worse results. You find the instructions here.
+Continuous Integration in this case means updating our published pipeline when there are changes to the code. In order to garantuee correctness, we want to make sure that we don't publish a subpar pipeline that doesn't improve or prouces worse results. You find the instructions [[./day2-continuous-integration.org][here]].
 
 ** No Continuous Monitoring?
 Maybe in day 3.

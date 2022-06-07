@@ -2,10 +2,6 @@
 #+author: luklun
 
 * Getting Started
-If you haven't already done so, create a new, empty GitHub code repository with a fun name. This repository will be our own MLOps respiratory. Although we will reuse some code from the main workshop MLOps repo we start with an empty git repository. This is so we are all fully aware of what each piece of code does in our repo.
-
-Create a local folder for your code with the same name as your new repo and initialize the repo locally. Add a nice README and commit and push it to your repository. Then, checkout the main workshop MLOps repository to a separate folder (we will copy some code from here later)
-
 If you haven't already, set up your [[./setup-python.org][Python Environment]] and then the [[./setup-azure.org][Azure CLI]].
 
 * Interactive Experiment Tracking

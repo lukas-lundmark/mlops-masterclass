@@ -1,16 +1,14 @@
 #+title: GitHub Integration - Day 1
 #+author: luklun
 
-* Getting Started
-If you haven't already done so, create a new, empty GitHub Repository (Although we can/will use some code from the public MLOps repo we will start with an empty git repository. This is so we are fully aware of what each piece of code does in our repo).
 
-Initialize the repo locally or remotely.
+* Getting Familiar with GitHub Actions
+If you are unfamiliar with CI/CD pipelines you can start simple. If you started from the project template you should already have a project with a GitHub repo setup. It should also contain a .github folder. Create a new folder called workflows in the .github. This folder will store the GitHub Action workflows.
 
-** Getting Familiar with GitHub Actions
-If you are unfamiliar with CI/CD pipelines you can start simple.
-Create a .github/workflows directory in the project root directory. Open your text editor of choice and create a file named workflow.yaml. Write
+Open your text editor of choice and create a file named hello-world.yaml. Write the following
 
 #+begin_src yaml
+# .github/workflows/hello-world.yaml
 name: Hello World
 
 on:
@@ -19,21 +17,23 @@ on:
 
 jobs:
   hello-world-job:
-    name: Hello World
-    runs-on: ubuntu-latest
-    steps:
-      - name: Say Hello
-        run: echo "HELLO WORLD"
+    name: Hello World # Will be displayed when overviewing the jobs
+    runs-on: ubuntu-latest # The OS of the runner virtual machine
+    steps: # The list of steps in this job
+      - name: Say Hello # This will be displayed when this step is exectued
+        run: echo "HELLO WORLD" # The shell action to perform
 #+end_src
 
 This is a simple GitHub Workflow that will be triggered on pushes to the main branch. It starts a single job running on an ubuntu runner. The job has one single step that echoes HELLO WORLD to the console.
 
-Commit and push to main.
+Commit and push to the main branch.
 #+begin_src bash
 git add .github/workflows
 git commit -m "Adding Hello World"
 git push origin main
 #+end_src
+
+(I am gonna assume that you are atleast somewhat familiar with how git works)
 
 Go to your repository page on GitHub and click the Action tab. You should see a new workflow run has started. Click on the workflow, and look at the different steps. One of them should have written HELLO WORLD to the console. Note that you didn't need to do anything other than creating a valid workflow file for a workflow to be created and started.
 
@@ -70,9 +70,15 @@ Check on your GitHub profile page, under the packages tab to see if you have a n
 
 Remember that Personal Access Token (you did save it, right?). Create a new GitHub secret in your repository. Go to the project settings, secrets, and action. Give it the name CR_PAT and past the in the access token.
 
-Now, we need to create a new job that will need to perform three different steps. It will need to checkout the current repo, it needs to login to GHCR, and it needs to build and push the image. Fortunately for us, there exist prebuilt GitHub Actions for all these steps. Below you can see an example of how this can be done
+Now, we need to create a new workflow that will need to perform three different steps. It will need to checkout the current repo, it needs to login to GHCR, and it needs to build and push the image. Fortunately for us, there exist prebuilt GitHub Actions for all these steps. Below you can see an example of how this can be done
 
 #+begin_src yaml
+name: Building Docker
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+jobs:
   build-and-push-docker-image:
     name: Build Docker image and push to repositories
     runs-on: ubuntu-latest
@@ -96,30 +102,21 @@ Now, we need to create a new job that will need to perform three different steps
 
 Add this job and see if your container builds and that you get a new package in your account.
 
+
+
+
 *** Improvements
-There are a few things we can improve. First, this job will now run every time we push. This is a bit wasteful since we have to waste a few minutes every time. Instead, we can add a filter step  before the build that checks if the environment definition was updated
+There is no need to rebuild the image every time we commit to main. Instead, we should only rebuid if something related to the environment_setup directory changes.
 
+Add the paths defintion to the *on* key like this:
 #+begin_src yaml
-- name: filter
-  uses: dorny/paths-filter@v2
-  id: filter
-  with:
-    filters: |
-      workflows:
-        - 'environment_setup/**'
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'environment_setup/**'
+  workflow_dispatch:
 #+end_src
-
-We can then add an if-statement to the build step, making it so that it only builds if the commit contains relevant changes
-
-#+begin_src yaml
-# ...
-- name: Build and Push
-  uses: docker/build-push-action@v2
-  if: steps.filter.outputs.workflows == 'true'
-  # ...
-#+end_src
-
-Note that the job will still run and succeed, even if no files were updated, just that this step will be skipped if the filter wasn't triggered.
 
 The second improvement would be to add more tags to the image. Right now, we overwrite the previous image with a new one, which isn't good for reproducibility. A fix is to use two tags when building. One tag that uses the current commit hash, and one that uses the latest. This way, you know which build generated a certain image. In this workshop, it might be overkill, so try it if you want to
 
@@ -220,7 +217,7 @@ JSON_STRING=$(jq -n \
 echo -e $JSON_STRING >> $PWD/config.json
 #+end_src
 
-However, at this point, this is becoming a lot of boiler plate to just connect to Azure ML. We can make all of this necessary setup by creating our own Github action. Local actions are made by adding an *actions* folder in the .github directory.  Create a folder named aml_login in actions and an empty file action.yml in it. The following code defines an action that takes the Azure Credentials, Resource Group, and Workspace name and performs the steps we outlined earlier.
+However, at this point, this is becoming a lot of boiler plate to just connect to Azure ML. We can make all of this necessary setup by creating our own Github action. Local actions are made by adding an *actions* folder in the .github directory. There is already a predefined action for this in your tenpmlate. The following code defines an action that takes the Azure Credentials, Resource Group, and Workspace name and performs the steps we outlined earlier.
 
 #+begin_src yaml
 name: 'aml_log'
@@ -288,37 +285,39 @@ steps:
 
 Actions are a convenient way to reduce code duplication (although I think Azure DevOps's job templates are far superior).
 
-You should now be able to run the build process for the Azure ML pipeline or the AML training script we built earlier.
+Create yet another workflow now that simple connects to Azure and runs the pipeline you created during the last day.
+It should contain a job that looks like this
 
 #+begin_src yaml
-- name: Build Pipeline
+- name: Run Pipeline
   # run: python -m ml_pipelines.build_train_pipeline
-  run: python -m ml_pipelines.run_train_script.py
+  run: python -m ml_pipelines.run_pipeline.py
 #+end_src
 
-Commit the changes to your workflow and see if you successfully built the pipeline or ran your script.
+For convinience, you should give it a workflow_dispatch trigger. Such that you can trigger it manually from GitHub.
 
-Tips: If you have a problem with git in your Workflow complaining about you not having access to the repo you can add this extra step in the aml_login action
 #+begin_src yaml
-- name: Workaround permission error
-  run: |
-    REPOSITORY_NAME=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
-    git config --global --add safe.directory /__w/$REPOSITORY_NAME/$REPOSITORY_NAME
+on: workflow_dispatch
 #+end_src
 
-If you built a new pipeline based on code changes, we can make a similar job that will run the pipeline. The reason for having the build and the run in different jobs is because you might want the run to be triggered without having to rebuild the pipeline, say that the dataset is updated, or data drift is detected, or something similar.
+Go to the Actions tab in your repo, click on this workflow (it should have either the name you gave it or the path to the workflow file).  Click on the workflow and then click the Run workflow button
 
-Create a new job that runs the training pipeline. Commit some changes and see if everything works as expected. If everything works correctly, you should now have an automatic CI pipeline that automatically runs your workflow on code changes. This is just the beginning, however, because if you start to integrate Azure ML with Event Hub we can start to send events to trigger our workflow. This will allow the workflow to run on updates to datasets or detected data drift, for example.
+** Step Outputs
+You can set the output of a step, such that later steps in the job can reference that information. For example, it might be useful for later step in the process to know if the pipeline finished or if it was cancelled.
 
-Currently, these Azure ML events are available to use in Azure Event Hub:
-- ModelRegistered
-- ModelDeployed
-- RunCompleted
-- DatasetDriftDetected
-- RunStatusChanged
+The syntax looks like this
+#+begin_src yaml
+- name: step name
+  id: unique-id
+  run |
+    # Do something here
+    # Do something else
+    # Set the output
+    echo ::set-output name=<name-of-output>::<value-of-output>
+#+end_src
 
-With two jobs for training buildup and training execution, you are in a pretty good position to automate your training. Try to make some modifications to your training scripts.
+You can then reference it as
+steps.unique-id.outputs.<name-of-output>
 
-Tips: Some tips for testing and debugging.  Usually, I find it good to have two different experiments, and two different model names, when I am testing like. One for local testing, and one for serious runs. You can do this by using environment variables.
-
-There is a package called python-dotenv in the default environment. This package lets you load the environment variables from a file named .env in your current directory. It's good practice to have your orchestration code load local environment variables.
+Update your pipeline run script to output the final status of the pipeline run to a file. And then save the result of that file as an output of the step
+Then, make if so that if the status was "Finished". You dispatch
