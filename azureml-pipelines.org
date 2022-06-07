@@ -1,11 +1,11 @@
 * Converting your Notebook into a training script
-Notebooks are perfect for rapid development, but they can be difficult to collaborate on, and hard to automate, and also morechallenging to reproduce, making them ill-suited for MLOps. After having become familiar with Azure ML basic, having both created a small protoype model and having deployed a model, we will now convert our notebook to a training script, such that we can start to automate the retraining process, moving closer to a MLOps Level 1 setup.
+Notebooks are perfect for rapid development, but they can be difficult to collaborate on, hard to automate, and also more challenging to reproduce, making them ill-suited for MLOps. After having become familiar with Azure ML basic, having both created a small prototype model and having deployed a model, we will now convert our notebook to a training script, such that we can start to automate the retraining process, moving closer to a MLOps Level 1 setup.
 
 ** Setting up a non-interactive Run
 Create a single file called ~train.py~ in the ~src~ directory. Extract the necessary code from your notebook into the train.py file. It should connect to your Azure ML workspace, download the necessary dataset, and train and register the model, as you did before. You can discard the visualization since it is not necessary.
 
 Make sure that you can run the script as src_bash{python src/train.py}
-and that it can run without failing, just like in your notebook.
+and that it can run without fail, just like in your notebook.
 
 Now, you might want to commit your code, because we are now gonna start breaking things.
 
@@ -29,7 +29,7 @@ src = ScriptRunConfig(source_directory='src', script='train.py', environment=env
 run = experiment.submit(src)
 run.wait_for_completion(show_output=True)
 #+end_src
-You might notices that this shares many similarities with how we defined deployments - specify the scripts we want to run, and the environment we want to run them in.
+You might notice that this shares many similarities with how we defined deployments - specify the scripts we want to run, and the environment we want to run them in.
 
 Before we run this experiment, you need to modify *train.py* script a little bit compared to before. Replace the creation of the workspace, experiment, and the run in your script. Replace these calls
 #+begin_src python
@@ -62,7 +62,7 @@ python -m ml_pipelines.run_train_script.py
 This should start a new run in a Docker environment on your local machine. If you go to the Studio you should still see a new run having started on the experiment.
 
 ** Using AML Compute
-Now, we will again allocate some compute resources in Azure ML to run our code. A small CPU cluster is often enough for our very basic training scripts. Especially if you are using a free Azure subscription, since they put strict limitations on the number of vCores you can use.
+Now, we will again allocate some compute resources in Azure ML to run our code. A small CPU cluster is often enough for our very basic training scripts. Especially if you are using a free Azure subscription since they put strict limitations on the number of vCores you can use.
 
 #+begin_src python
 # ml_pipelines/run_train_script.py
@@ -98,20 +98,19 @@ src = ScriptRunConfig(
 
 Run the orchestration code again. If you look at the *compute* section in the Studio, and under compute clusters, you should see that a new cluster is being created. Then, you will see it starting to scale up from zero cores to one. This process can take a couple of minutes.
 
-After the compute resource has been created, you experiment will run. Before that, it will be queued. You can check the experiment section and see the status of the run. If you are feeling bored, you can inspect the logs of your run. You should start to see how the docker container that will exectute your code is being built.
+After the compute resource has been created, your experiment will run. Before that, it will be queued. You can check the experiment section and see the status of the run. If you are feeling bored, you can inspect the logs of your run. You should start to see how the docker container that will execute your code is being built.
 
-Note that it will take much quicker to run the experiment a second time. The environment will note have to be created again, and if you run the script before the cluster scales down it should start almost immediately.
-
+Note that it will take much quicker to run the experiment a second time. The environment will not have to be created again, and if you run the script before the cluster scales down it should start almost immediately.
 
 ** Sending Arguments to the Script
-A lot of values in the original notebook, such as dataset and model names, where hard coded in the original notebook. This works okay in notebooks, since they are meant to be interactive and are easy to change. However, in scripts, we generally want such values to be modifiable using arguments. Python's default argparse module will suffice
+A lot of values in the original notebook, such as dataset and model names, were hard coded in the original notebook. This works okay in notebooks, since they are meant to be interactive and are easy to change. However, in scripts, we generally want such values to be modifiable using arguments. Python's argparse package is usually enough to get the job done.
 
-Write something like this to replace the hard coded values for the train and test dataset names
+Write something like this to replace the hard-coded values for the train and test dataset names
 #+begin_src python
 # scr/train.py
 import argparse
 
-parser = argparse.ArgumentParser("This")
+parser = argparse.ArgumentParser("Script for running the training script")
 parser.add_argument('--train-dataset', default='diamond-train')
 parser.add_argument('--test-dataset', default='diamond-test')
 parser.add_argument('--model-name', default='diamond-regressor')
@@ -144,18 +143,18 @@ src = ScriptRunConfig(
 #+end_src
 This is a good place to use environment variables to make it so we can dynamically change the name of the model or datasets by changing the values in our ~.env~.
 
-Finish this new the orchestration script with a new value for the model. If you look at the Run in the studio you should be able to see exactly which values where provided to the script when it was invoked, another useful tool when reproducing earlier experiments. This should register a new model
+Finish this new orchestration script with a new value for the model. If you look at the Run in the studio you should be able to see exactly which values were provided to the script when it was invoked, another useful tool when reproducing earlier experiments. This should register a new model
 
-In the next section, we will convert this single script to persistant pipeline that we can invoke without having to resubmit new code each time.
+In the next section, we will convert this single script to a persistent pipeline that we can invoke without having to resubmit new code each time.
 
 * Convert your Notebook to an Azure ML Pipeline
-Scripts are nice, but it's a hassle having to resubmit a new script everytime if we just want to run the training multiple times.  Pipelines allows us to keep a definition of one or more scripts in the cloud, which we can then invoke either via the SDK, CLI, or via a REST call. It also allows us to break down our training logic into reusable components that we can use in multiple different pipelines.
+Scripts are nice, but it's a hassle having to resubmit a new script every time if we just want to run the training multiple times.  Pipelines allow us to keep a definition of one or more scripts in the cloud, which we can then invoke either via the SDK, CLI, or a REST call. It also allows us to break down our training logic into reusable components that we can use in multiple different pipelines.
 
-Azure ML Pipelines consists of a series of python scripts with a defined run order. Each step may run on separate compute and in separate environments. For example, you can use a small cluster for data preprocessing, and then a GPU-enabled compute instance to train your large deep learning models, without incurring excessive cost.
+Azure ML Pipelines consist of a series of python scripts with a defined run order. Each step may run on separate compute and in separate environments. For example, you can use a small cluster for data preprocessing, and then a GPU-enabled compute instance to train your large deep learning models, without incurring excessive costs.
 
 However, they can be annoying to debug since they (for some reason) can't run on your local computer, and need to be submitted to Azure ML.
 
-Each PipelineStep is very similar to a ScriptRunConfigs, with some minor changes. Important to note, there is a slight difference in how Runs work in pipelines. The pipeline itself has it's own parent run, and each pipeline step is its own child run with its own run id. For convenience, it is nice to log metrics both in the child and the parent-run. Similarly, it is often better to register the model to the parent-run, rather than the child run, since it makes it easier to inspect the logs in the Studio. Get the parent run and replace the normal run.log with parent_run.log
+Each PipelineStep is very similar to a ScriptRunConfigs, with some minor changes. Important to note, that there is a slight difference in how Runs work in pipelines. The pipeline itself has its own parent-run, and each pipeline step is its own child-run with its own run id. For convenience, it is nice to log metrics both in the child and the parent-run. Similarly, it is often better to register the model to the parent-run, rather than the child-run, since it makes it easier to inspect the logs in the Studio. Get the parent-run and replace the normal run.log with parent_run.log
 
 For example
 #+begin_src python
@@ -206,7 +205,7 @@ python -m ml_pipelines.build_pipeline.py
 
 Take note of the pipeline id which was printed, since it is needed to identify the pipeline in your workspace (you can also look in the Studio under the Pipeline page and see if a new pipeline was registered).
 
-The pipeline object now exists as a callable object your workspace and can easily be executed whenever we see fit, regardless if the code change or not. We can then create a new orchestration script ~ml_pipelines/run_pipeline.py~ that will pipeline invoke the pipeline
+The pipeline object now exists as a callable object in your workspace and can easily be executed whenever we see fit, regardless if the code change or not. We can then create a new orchestration script ~ml_pipelines/run_pipeline.py~ that will pipeline invoke the pipeline
 
 #+begin_src python
 # ml_pipelines/run_pipeline.py
@@ -221,7 +220,7 @@ status = run.wait_for_completion(show_output=True)
 print(status) # Should say finished
 #+end_src
 
-Tips: If you just want to run the latest version of a pipeline and you lost the id you can just get the list of all pipeline and filter by name, and then select the first in that list.
+Tips: If you just want to run the latest version of a pipeline and you lost the id you can just get the list of all pipelines and filter by name, and then select the first in that list.
 
 #+begin_src python
 pipelines = PublishedPipeline.list(workspace)
@@ -230,9 +229,9 @@ pipeline = pipelines[0]
 #+end_src
 
 * Pipeline Parameter
-One problem with our current pipeline is that we have no means to change how we invoke it. Everytime we call it will just run the same set of steps, producing the same results (except if we uplaod a new version of the dataset). But what if we wanted to change the name of the model we produce, or download a different dataset. How could we do that without having to submit a new pipeline, which was the whole point of using pipelines in the first place.
+One problem with our current pipeline is that we have no means to change how we invoke it. Every time we call it will just run the same set of steps, producing the same results (except if we upload a new version of the dataset). But what if we wanted to change the name of the model we produce or download a different dataset. How could we do that without having to submit a new pipeline, which was the whole point of using pipelines in the first place?
 
-Fortunently, pipelines have a utility called PipelineParameters, which is a way to dynamically change the arguments given the different script when invoked. And a PipelineStep takes a PipelineParameter as input, the parameter becomes part of the Pipeline Defintion, and can be set when the pipeline is invoked.
+Fortunately, pipelines have a utility called PipelineParameters, which is a way to dynamically change the arguments given the different scripts when invoked. And a PipelineStep takes a PipelineParameter as input, the parameter becomes part of the Pipeline Defintion and can be set when the pipeline is invoked.
 
 Say that you have a script that take a parameter named ~arg~
 #+begin_src python
@@ -268,14 +267,14 @@ response = requests.post(
 )
 #+end_src
 
-As a final excerice, modify you pipeline_build script to add pipeline arguments that can change the name of the model. Then, modify the run_pipeline script to take the model name as an optional parameter, which it then provides as a pipeline parameter when invoking the pipeline. This might seem quite basic, but it will be useful in the next day of the workshop, when we want to configure the pipeline to run certain checks given certain conditions.
+As a final exercise, modify your pipeline_build script to add pipeline arguments that can change the name of the model. Then, modify the run_pipeline script to take the model name as an optional parameter, which it then provides as a pipeline parameter when invoking the pipeline. This might seem quite basic, but it will be useful on the next day of the workshop when we want to configure the pipeline to run certain checks given certain conditions.
 
 
 * Optional Section
 If you have come this far and still have some time left to kill, you can dive deeper into some more advanced pipeline topics
 
 ** Pipeline Endpoint
-Having to keep track pipeline IDs quickly becomes annoying. Named Pipeline Endpoints offer a consistent endpoint that you can use to invoke your latest pipeline. You set your latest pipeline as the endpoint's default and simply call the endpoint as you would any other pipeline. You can then change the default pipeline of the endpoint whenever you build a new pipeline, and still invoke it the same way.
+Having to keep track of pipeline IDs quickly becomes annoying. Named Pipeline Endpoints offer a consistent endpoint that you can use to invoke your latest pipeline. You set your latest pipeline as the endpoint's default and simply call the endpoint as you would any other pipeline. You can then change the default pipeline of the endpoint whenever you build a new pipeline and still invoke it the same way.
 
 You can create/update a pipeline endpoint using a simple script, like this
 #+begin_src python
@@ -319,4 +318,4 @@ print(status)
 ** More Advanced Pipelines
 The current pipeline is embarrassingly simple, merely consisting of a single step. As our project matures, we should start to break up the training script into smaller sub-scripts, such that they can be reused in other pipelines or by other members of the project. Maybe one script to check if we have new data to train on, one script to clean the data, and so forth.
 
-If you want an example of how your can create more (read overly) complex pipelines with different steps, you can look at the ~complex_pipeline~ in the example repo. You find the script definitions [[https://github.com/lukas-lundmark/mlops-example/tree/main/src/complex_pipeline][here]], and the various orchestration scripts [[https://github.com/lukas-lundmark/mlops-example/tree/main/ml_pipelines/complex_pipeline][here]].
+If you want an example of how you can create more (read overly) complex pipelines with different steps, you can look at the ~complex_pipeline~ in the example repo. You find the script definitions [[https://github.com/lukas-lundmark/mlops-example/tree/main/src/complex_pipeline][here]], and the various orchestration scripts [[https://github.com/lukas-lundmark/mlops-example/tree/main/ml_pipelines/complex_pipeline][here]].
