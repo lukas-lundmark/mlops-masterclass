@@ -2,20 +2,20 @@
 #+author: luklun
 
 * Getting Started
-If you haven't already, set up your [[./setup-python.org][Python Environment]] and then the [[./setup-azure.org][Azure CLI]].
+If you haven't done so already, set up your [[./setup-python.org][Python Environment]] and then the [[./setup-azure.org][Azure CLI]].
 
 * Interactive Experiment Tracking
-We are gonna start with getting familiar with Azure ML and how it can be used to track our interactive notebook experiments. In a normal DS project, this experiment phase will take up the majority of the time. In this workshop, however, we will speed through this phase by starting from a preexisting notebook. Create a new directory called notebooks or experiments. Copy the notebook *notebooks/Exploratory Data Analysis Local.ipynb* from the example repo and place it in a notebook folder in your own repo.
+We are gonna start with getting familiar with Azure ML and how it can be used to track our interactive notebook experiments. In a normal DS project, this experiment phase will take up the majority of the time. In this workshop, however, we will speed through this phase by starting from a preexisting notebook. Create a new directory called notebooks or experiments. Copy the notebook *notebooks/Exploratory Data Analysis Local.ipynb* from the example repo and place it in a notebook folder in your repo.
 
 ** Starting a Jupyter Notebook
 Before you start the notebook it can be a good idea to login to your [[./setup-azure.org][Azure CLI]]. Also, make sure you have activated your python environment. Then run
 
-Start a Jupyter Notebook Server from the root of your repos root directory and try to run through the notebook one time. You will need to download the data from the [[https://drive.google.com/drive/u/0/folders/1BuHRP-4f8Ai4j8nqwLYcB1KZSJIy7mQz][Google drive]] and place it in a folder called data in order to run the experiment.
+Start a Jupyter Notebook Server from the root of your repo's root directory and try to run through the notebook one time. You will need to download the data from the [[https://drive.google.com/drive/u/0/folders/1BuHRP-4f8Ai4j8nqwLYcB1KZSJIy7mQz][Google Drive]] and place it in a folder called data to run the experiment.
 
 ** Access your workspace
-After you have made sure that the experiments works locally, the next step is to connect to the cloud. In the launcher for Azure ML workspace in the Azure Portal (not the Studio), download the workspace config file and add it to the root folder. Create a .gitignore file and add config.json to it so you don't accidentally push that file to your repo. This configuration file identifies your Azure ML workspace and if you are in an environment with access to that workspace, i.e., you are logged in via your Azure CLI, you have access to all of the workspace's resources.
+After you have made sure that the experiments work locally, the next step is to connect to the cloud. On the page for your Azure ML workspace in the Azure Portal (not the Studio), download the workspace config file and add it to the root folder. This configuration file identifies your Azure ML workspace and if you are in an environment with access to that workspace, i.e., you are logged in via your Azure CLI, you have access to all of the workspace's resources.
 
-In your notebook, import the Azure Machine Learning package. If you initialized the environment from the conda file it should already be installed. You can import all the classes we will use right away
+In your notebook, import the Azure Machine Learning package. If you initialized the environment from the conda yaml file it should already be installed. You can import all the classes we will use right away
 
 #+begin_src python
 from azureml.core import Workspace, Experiment, Dataset, Datastore, Run, Model
@@ -50,9 +50,9 @@ dataset = Dataset.Tabular.register_pandas_dataframe(
     description='This is some dataset'
 )
 #+end_src
-The datastore is a blob storage account where the data you upload will be stored. Each Azure ML workspace are given a new blob storage accoutn by default so that is usually used
+The datastore is a blob storage account where the data you upload will be stored. Each Azure ML workspace is given a new blob storage account by default which is most often used when uploading new data.
 
-The datasets object will not contain the actual data. Instead it contains meta information, such as id, name and version, as well as the storage location of the data. If you want to use the data, you need to materialize it somehow, for example by downloading it as a dataframe.
+The datasets object will not contain the actual data. Instead, it contains meta information, such as id, name, and version, as well as the storage location of the data. If you want to use the data, you need to materialize it somehow, for example by downloading it as a data frame.
 
 #+begin_src python
 df = dataset.to_pandas_dataframe()
@@ -77,7 +77,7 @@ For the workshops, since we have two datasets - one training and one test - you 
 After this, you should be able to restart your notebook completely and have the data downloaded from Azure ML automatically. This enables anyone else who has access to your workspace to run your notebooks, without having to share the data or having to add the data to the code repository.
 
 ** Run Interactive Experiments with Experiment Tracking
-Now that the data works, we should move down to the training code in the notebook. We want to define an experiment to which can store our runs. Set a suitable experiment name, e.g., diamond-regression-experiment-interactive
+Now that the data works, we should move down to the training code in the notebook. We want to define an experiment that can store our runs. Set a suitable experiment name, e.g., diamond-regression-experiment-interactive
 
 #+begin_src python
 experiment = Experiment(ws, 'workshop-experiment')
@@ -88,7 +88,7 @@ Then, instatiate an interactive run. Note that we use
 run = experiment.start_logging(snapshot_directory='.')
 #+end_src
 
-If you go to Azure ML Studio you should now be able to see that the experiment has been created, and that it has an active (running) run.
+If you go to Azure ML Studio you should now be able to see that the experiment has been created and that it has a running run.
 
 Change the code to log the metric using the run.log to log metrics
 #+begin_src python
@@ -101,7 +101,7 @@ Finish the interactive run with
 run.complete()
 #+end_src
 
-Check on your workspace that the experiment run was completed, and that the results of your run were logged in the run. If it's marked as still running it means you forgot to run the src_python{run.complete(). If you want, you can manually complete or cancell the run from within the Studio.
+Check on your workspace that the experiment run was completed and that the results of your run were logged in the run. If it's marked as still running it means you forgot to run the src_python{run.complete(). If you want, you can manually complete or cancel the run from within the Studio.
 
 Check the log and outputs of the run. You can see that each run has a local copy of your source directory. This is what you specified with the *snapshot_dir parameter*. This is a good way for others to see what code was used to generate a run. Similarly, the run also contains information regarding your git repository, showing which commit was used to run the experiment and if the branch was dirty when the code ran.
 
@@ -164,5 +164,5 @@ try:
     latest_model = Model(ws, name="my-regressor")
     r2 = latest_model.tags.get("r2", np.inf)
 except WebserviceException as e:
-    ...
+    # ...
 #+end_src
