@@ -2,12 +2,12 @@
 Notebooks are perfect for rapid development, but they can be difficult to collaborate on, and hard to automate, making them ill-suited for MLOps. After having become familiar with the Azure ML basic, we are gonna convert our notebook to a simple training script that we will run both locally, and remotely.
 
 ** Setting up a non-interactive Run
-Create a directory called "src" in your repository. Create a single file called ~train.py~ there. Extract the necessary code from your notebook into the train.py file. It should connect to your Azure ML workspace, and download the necessary dataset, as you did before.
+Create a directory called "src" in your repository. Create a single file called ~train.py~ there. Extract the necessary code from your notebook into the train.py file. It should connect to your Azure ML workspace, and download the necessary dataset, as you did before. You can discard the visualization.
 
 Make sure that you can run the script as src_bash{python src/train.py}
-and that it runs until completion, just like in your notebook.
+and that it can run without failing, just like in your notebook.
 
-Commit this code, because we are now gonna start breaking things. Create a second folder called *ml_pipelines* in the project root. This folder will contain orchestration code for our training scripts. "Orchestration" code in Azure ML is SDK code that manages the execution of our experiments. It defines the environment for the scripts to run in, provisions compute for the experiments, and can also manage how models are deployed.
+You might want to commit your code now, because we are now gonna start breaking things.
 
 Create a script in *ml_pipelines* called *run_train_script.py*. For now, this script only needs to define a python run step and the environment it should run in. To make debugging easier we start by running it locally. We can reuse the environment we used for deployment earlier.
 
@@ -28,6 +28,7 @@ src = ScriptRunConfig(source_directory='src', script='train.py', environment=env
 run = experiment.submit(src)
 run.wait_for_completion(show_output=True)
 #+end_src
+You might notices that this shares many similarities with how we defined deployments - specify the scripts we want to run, and the environment we want to run them in.)
 
 Before we run this experiment, you need to modify *train.py* script a little bit. Replace the creation of the workspace, experiment, and the run in your script
 #+begin_src python
@@ -51,7 +52,7 @@ experiment = run.experiment
 workspace = run.experiment.workspace
 #+end_src
 
-This change is required because now the orchestration code is responsible for instantiating the run, and the script gets those objects from the Run context instead. Note that we also removed the src_python{run.complete(), since AML will now handle the ending the run.
+This change is required because now the orchestration code is responsible for starting the run, and the script gets those objects from the Run context instead. Note that we also removed the src_python{run.complete(), since AML will now handle the ending the run.
 
 Execute the new orchestration code to start the run.
 #+begin_src bash
@@ -80,6 +81,7 @@ except ComputeTargetException:
     # This will block the script until the resource is created
     cpu_cluster.wait_for_complete(show_output=True)
 #+end_src
+
 Note the usual creation pattern, with a try and except clause. We also block until the resource has been created, which takes up to five minutes.
 
 Set the new cpu_cluster as the compute_target for the ScriptRunConfig
@@ -139,7 +141,7 @@ src = ScriptRunConfig(
     arguments= ['--model-name', 'new-diamond-regressor']
 )
 #+end_src
-This is a good place to use environment variables to make it so we can dynamically change the name of the model or datasets by merely changin the values in our ~.env~.
+This is a good place to use environment variables to make it so we can dynamically change the name of the model or datasets by changing the values in our ~.env~.
 
 Finish this new the orchestration script with a new value for the model. If you look at the Run in the studio you should be able to see exactly which values where provided to the script when it was invoked, another useful tool when reproducing earlier experiments. This should register a new model
 
@@ -201,7 +203,7 @@ print(published_pipeline.id)
 python -m ml_pipelines.build_pipeline.py
 #+end_src
 
-Take note of the pipeline id which was printed, since it is needed to identify the pipeline in the cloud (you can also look in the Studio under the Pipeline page and see if a new pipeline was registered).
+Take note of the pipeline id which was printed, since it is needed to identify the pipeline in your workspace (you can also look in the Studio under the Pipeline page and see if a new pipeline was registered).
 
 The pipeline object now exists as a callable object your workspace and can easily be executed whenever we see fit, regardless if the code change or not. We can then create a new orchestration script ~ml_pipelines/run_pipeline.py~ that will pipeline invoke the pipeline
 
@@ -227,7 +229,9 @@ pipeline = pipelines[0]
 #+end_src
 
 * Pipeline Parameter
-One problem with our current pipeline is that we have no means to change how we invoke it. Everytime we call it will just run the same set of steps, producing the same results (except if we uplaod a new version of the dataset). But what if we wanted to change the name of the model we produce, or download a different dataset. How could we do that without having to submit a new pipeline, which was the whole point of using pipelines in the first place. Fortunently, pipelines have a utility called PipelineParameters, which is a way to dynamically change the arguments given the different script when invoked. And a PipelineStep takes a PipelineParameter as input, the parameter becomes part of the Pipeline Defintion, and can be set when the pipeline is invoked.
+One problem with our current pipeline is that we have no means to change how we invoke it. Everytime we call it will just run the same set of steps, producing the same results (except if we uplaod a new version of the dataset). But what if we wanted to change the name of the model we produce, or download a different dataset. How could we do that without having to submit a new pipeline, which was the whole point of using pipelines in the first place.
+
+Fortunently, pipelines have a utility called PipelineParameters, which is a way to dynamically change the arguments given the different script when invoked. And a PipelineStep takes a PipelineParameter as input, the parameter becomes part of the Pipeline Defintion, and can be set when the pipeline is invoked.
 
 Say that you have a script that take a parameter named ~arg~
 #+begin_src python
