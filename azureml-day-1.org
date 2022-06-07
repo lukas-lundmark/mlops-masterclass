@@ -83,7 +83,7 @@ Now that the data works, we should move down to the training code in the noteboo
 experiment = Experiment(ws, 'workshop-experiment')
 #+end_src
 
-Then, instatiate an interactive run. Note that we use
+Then, instatiate an interactive run.
 #+begin_src python
 run = experiment.start_logging(snapshot_directory='.')
 #+end_src
