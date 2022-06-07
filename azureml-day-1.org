@@ -101,9 +101,15 @@ Finish the interactive run with
 run.complete()
 #+end_src
 
+#+attr_html: :style margin-left: auto; margin-right: auto; :width 450px
+[[./figures/run-overview.png]]
+
 Check on your workspace that the experiment run was completed and that the results of your run were logged in the run. If it's marked as still running it means you forgot to run the src_python{run.complete(). If you want, you can manually complete or cancel the run from within the Studio.
 
-Check the log and outputs of the run. You can see that each run has a local copy of your source directory. This is what you specified with the *snapshot_dir parameter*. This is a good way for others to see what code was used to generate a run. Similarly, the run also contains information regarding your git repository, showing which commit was used to run the experiment and if the branch was dirty when the code ran.
+#+attr_html: :style margin-left: auto; margin-right: auto; :width 450px
+[[./figures/azure-ml-code.png]]
+
+Check the log and code section of the run. You can see that each run has a local copy of your source directory. This is what you specified with the *snapshot_dir parameter*. This is a good way for others to see what code was used to generate a run. Similarly, the run also contains information regarding your git repository, showing which commit was used to run the experiment and if the branch was dirty when the code ran.
 
 ** Register a model in the Model Registry and log metrics
 Registering a model is straightforward. We just need to save the model locally in a format we can load later, joblib is usually the standard for scikit-learn models. Joblib is a modified version of python's standard serializing library pickle which is better optimized for binary data
