@@ -1,15 +1,15 @@
 * Converting your Notebook into a training script
-Notebooks are perfect for rapid development, but they can be difficult to collaborate on, and hard to automate, making them ill-suited for MLOps. After having become familiar with the Azure ML basic, we are gonna convert our notebook to a simple training script that we will run both locally, and remotely.
+Notebooks are perfect for rapid development, but they can be difficult to collaborate on, and hard to automate, and also morechallenging to reproduce, making them ill-suited for MLOps. After having become familiar with Azure ML basic, having both created a small protoype model and having deployed a model, we will now convert our notebook to a training script, such that we can start to automate the retraining process, moving closer to a MLOps Level 1 setup.
 
 ** Setting up a non-interactive Run
-Create a directory called "src" in your repository. Create a single file called ~train.py~ there. Extract the necessary code from your notebook into the train.py file. It should connect to your Azure ML workspace, and download the necessary dataset, as you did before. You can discard the visualization.
+Create a single file called ~train.py~ in the ~src~ directory. Extract the necessary code from your notebook into the train.py file. It should connect to your Azure ML workspace, download the necessary dataset, and train and register the model, as you did before. You can discard the visualization since it is not necessary.
 
 Make sure that you can run the script as src_bash{python src/train.py}
 and that it can run without failing, just like in your notebook.
 
-You might want to commit your code now, because we are now gonna start breaking things.
+Now, you might want to commit your code, because we are now gonna start breaking things.
 
-Create a script in *ml_pipelines* called *run_train_script.py*. For now, this script only needs to define a python run step and the environment it should run in. To make debugging easier we start by running it locally. We can reuse the environment we used for deployment earlier.
+Create a script in ~ml_pipelines~ called ~run_train_script.py~. For now, this script only needs to define a python run step and the environment it should run in. To make debugging easier we start by running it locally. We can reuse the environment we used for deployment earlier.
 
 #+begin_src python
 # ml_pipeline/run_train_script
@@ -17,6 +17,7 @@ from azureml.core import Environment, Workspace, Experiment
 from ml_pipelines.utils import get_environment
 ws = Workspace.from_config()
 environment = get_environment()
+experiment = Experiment(ws, "some-experiment-name")
 #+end_src
 
 Then, create a ScriptConfig that references the extracted training script
@@ -28,9 +29,9 @@ src = ScriptRunConfig(source_directory='src', script='train.py', environment=env
 run = experiment.submit(src)
 run.wait_for_completion(show_output=True)
 #+end_src
-You might notices that this shares many similarities with how we defined deployments - specify the scripts we want to run, and the environment we want to run them in.)
+You might notices that this shares many similarities with how we defined deployments - specify the scripts we want to run, and the environment we want to run them in.
 
-Before we run this experiment, you need to modify *train.py* script a little bit. Replace the creation of the workspace, experiment, and the run in your script
+Before we run this experiment, you need to modify *train.py* script a little bit compared to before. Replace the creation of the workspace, experiment, and the run in your script. Replace these calls
 #+begin_src python
 # src/train.py (old)
 ws = Workspace.from_config()
@@ -52,7 +53,7 @@ experiment = run.experiment
 workspace = run.experiment.workspace
 #+end_src
 
-This change is required because now the orchestration code is responsible for starting the run, and the script gets those objects from the Run context instead. Note that we also removed the src_python{run.complete(), since AML will now handle the ending the run.
+This change is required because now the orchestration code is responsible for starting the run, and the script receives those objects from the Run context instead. Note that we also removed the src_python{run.complete(), since AML now ends the run for us.
 
 Execute the new orchestration code to start the run.
 #+begin_src bash
@@ -61,7 +62,7 @@ python -m ml_pipelines.run_train_script.py
 This should start a new run in a Docker environment on your local machine. If you go to the Studio you should still see a new run having started on the experiment.
 
 ** Using AML Compute
-Now, we will look into how to allocate compute resources in Azure ML. A small CPU cluster is often enough for these, very basic training scripts. Especially if you are using a free Azure subscription, since they put a strict limitation on the number of vCores you may use.
+Now, we will again allocate some compute resources in Azure ML to run our code. A small CPU cluster is often enough for our very basic training scripts. Especially if you are using a free Azure subscription, since they put strict limitations on the number of vCores you can use.
 
 #+begin_src python
 # ml_pipelines/run_train_script.py
