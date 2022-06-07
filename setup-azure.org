@@ -14,6 +14,10 @@ Unfortunently, due to each our Solita accounts only being given contributor righ
 
 A suggestion is that you try to complete the first part of the Masterclass / Workshop in the Sandbox and if you then have time and energy, you can complete the second part using your own account. The code we will write will be portable, such that you can recreate all your assets in a new workspace, without having to do any manual tinkering.
 
+#+attr_html: :style margin-left: auto; margin-right: auto; :width 450px
+#+caption: Create a new owkrspace
+[[./figures/workspace-creation.png]]
+
 ** Creating a Workspace in the Solita Sandbox
 You can access the Solita Sandbox by going to https://portal.azure.com and logging in with your solita.fi account. Solita already uses Active Directory (Azure's system for identity management) to manage our accounts, so you should have access to the Sandbox without having to register to anything.
 
@@ -27,7 +31,20 @@ Then, you can create your workspace. Search for ML in the search bar, click on A
 
 Click on review + create in the bottom left, see if the checks pass, then click on create. The portal will take maybe a minute to create your resources, so be patient. The portal will then offer you to go to your new resource page, or you can search for ML in the search bar, click Azure ML, search for the name of your workspace, and click on it. This will take you to the portal page of your workspace. Here you can download the workspace configuration by clicking the Download config.json button, which we will use later when accessing our ML resource.
 
+#+attr_html: :style margin-left: auto; margin-right: auto; :width 450px
+#+caption: Move to resource
+[[./figures/move-to-resources.png]]
+
+#+attr_html: :style margin-left: auto; margin-right: auto; :width 450px
+#+caption: The Azure Portal view of Azure ML
+[[./figures/azure-ml-portal.png]]
+
+
 From here you can also launch Azure ML Studio, which is the graphical interface for Azure ML. Take a few minutes and get familiar with the layout, take extra notice of the Data, Model and Job tabs, since we will start by looking those later.
+
+#+attr_html: :style margin-left: auto; margin-right: auto; :width 450px
+#+caption: Starting view of Azure ML Studio
+[[./figures/azure-ml-studio.png]]
 
 * Creating an Azure Account
 To do the workshop in its entirety you need to have an Azure account with Admin privileges. The Solita Sandbox will not be enough, at least for the second part, since you will not have sufficient privileges.
