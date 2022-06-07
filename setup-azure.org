@@ -3,56 +3,75 @@
 
 
 * Azure and Azure ML
-Azure ML is one of many ML-as-a-Service offerings that exist on the market. There is nothing unique about it, but it allows us to manage almost every step of the model life-cycle using a single, and a (somewhat) consistent API, which makes it good for learning.
+Azure ML is one of many ML-as-a-Service offerings that exist on the market. There is nothing particularly unique about it, but it allows us to manage most steps of the model's life-cycle using a single, and a (somewhat) consistent API, which makes it good for learning.
 
-You can read a brief introduction to Azure ML [[./azureml-info.org][here]], or watch the Recording of the presentation Introduction to Azure ML [[https://drive.google.com/file/d/1dngb8XDF2k96SzA93FPQsStdtUjZ1T7W/view?usp=sharing][here]].
+You can read a brief overview of Azure ML [[./azureml-info.org][here]], or watch a the presentation *Introduction to Azure ML* [[https://drive.google.com/file/d/1dngb8XDF2k96SzA93FPQsStdtUjZ1T7W/view?usp=sharing][here]].
+
+* Using the Solita Sandbox
+Solita has an Azure Sandbox that can be used for the first part of this masterclass / workshop. There are some quirks you need to work around in order to get everything up and running, but those are outlined clearly in the instructions so you don't have to worry. Most notably, the sandbox has some rules for how tags should be used when creating resources. This means that when we need to create certain resources (e.g., inference cluster) using the SDK later on, we can only create  resource that can be given tags (you will see when we get there).
+
+Unfortunently, due to each our Solita accounts only being given contributor rights to the subscriptiono, you cannot use the Sandbox to complete the second part of the workshop, since you need to create a Service Principle to access your resources from GitHub. You therefore need to create a private subscription if you want to complete the entire masterclass. See the next section for instructions to create a new subscription.
+
+A suggestion is that you try to complete the first part of the Masterclass / Workshop in the Sandbox and if you then have time and energy, you can complete the second part using your own account. The code we will write will be portable, such that you can recreate all your assets in a new workspace, without having to do any manual tinkering.
+
+** Creating a Workspace in the Solita Sandbox
+You can access the Solita Sandbox by going to https://portal.azure.com and logging in with your solita.fi account. Solita already uses Active Directory (Azure's system for identity management) to manage our accounts, so you should have access to the Sandbox without having to register to anything.
+
+If you have used this address for a customer company, you may need to change which active directory you use. Click the cog icon in the top right and select Solita Oy as your Directory.
+
+First of we need to create a resource group. A resource group is just a resource that groups together other related resources. Set the region Europe North and give it a good name that Azure approves of.
+
+Finally, you need to set the tags of the resource group. This is because the Solita Sandbox requires you to define who owns the resource and when it can be deleted. You are required to set two tags, otherwise the resource will not be created. First, ~Owner~, which you set to your solita.fi email adress, and DueDate, which you set to some date in the future, e.g., 01-01-2023, or something.
+
+Then, you can create your workspace. Search for ML in the search bar, click on Azure ML, click on +Create in the top-left corner. Start by giving the workspace a suitable name, e.g. <myname>-ml-ws. Set the resource group to the one you created earlier. You may keep everything else as default and you don't need to set any tags when creating this workspace. Although, you may create a new container registry if you want, but this will be created for you when you start using environments later anyway, so this is not a must, but it is useful if you want a name for your registry that isn't randomly generated.
+
+Click on review + create in the bottom left, see if the checks pass, then click on create. The portal will take maybe a minute to create your resources, so be patient. The portal will then offer you to go to your new resource page, or you can search for ML in the search bar, click Azure ML, search for the name of your workspace, and click on it. This will take you to the portal page of your workspace. Here you can download the workspace configuration by clicking the Download config.json button, which we will use later when accessing our ML resource.
+
+From here you can also launch Azure ML Studio, which is the graphical interface for Azure ML. Take a few minutes and get familiar with the layout, take extra notice of the Data, Model and Job tabs, since we will start by looking those later.
 
 * Creating an Azure Account
-To do the workshop you need to have an Azure account with Admin privileges since we will create service principals for our CI/CD pipelines. Solita's Sandbox will not be enough, since you will not have sufficient privileges. Creating a new account takes ca. 10-15 minutes and it can be used immediately after you create it. You get 200 USD of free credits to use for 30 days. Use this [[https://azure.microsoft.com/en-us/free/][link]] to sign up.
+To do the workshop in its entirety you need to have an Azure account with Admin privileges. The Solita Sandbox will not be enough, at least for the second part, since you will not have sufficient privileges.
+
+Creating a new, free account takes ca. 10-15 minutes and it can be used immediately after you create it. You get 200 USD of free credits to use for 30 days. Use this [[https://azure.microsoft.com/en-us/free/][link]] to sign up.
 
 Things to note:
 1. If you are logged in to an existing Azure account - e.g. your Solita account - in your browser Azure will sometimes refuse to let you create a new one. You can often get around this by using a private window in your browser.
 
 2. You need to provide a Credit Card or Debit Card when signing up. You will not be charged anything even after 30 days or if you use up your 200USD credits unless you agree to keep paying. If you don't have a Credit Card or Debit Card we can try to find another solution.
 
-* Installing the Azure CLI
-The Azure CLI is a Python Application and is installed using pip. It's recommended that you don't use a version of Python newer than 3.8.13, because some of the ML extension we will download doesn't support newer versions (as of now).
+**  Creating a Workspace in your private subscription
+The process is identical to how you do it in the Solita Sandbox (see the previous section above)- with the sole exception that you don't need to create a resource group beforehand (you can just click create new resource group when creating the workspace)  and you don't have to set any tags for the resource group.
 
-Note: If you followed the instructions for how to set up Python [[./setup-python.org][here]], you should already have the Azure CLI installed by default and you can skip this installation step
+* Installing the Azure CLI
+The Azure CLI is a Python Application and is installed using pip. It's recommended that you don't use a version of Python newer than 3.8.13, because some of the ML extension we will download doesn't support newer versions (June 2022).
+
+Note: If you followed the instructions for how to set up Python [[./setup-python.org][here]] or in the template directory, you should already have the Azure CLI installed in your conda environment and you can therefore skip this step
 
 #+begin_src bash
 pip install azure-cli
 #+end_src
 
 * Login to Azure
+The Azure CLI needs to know which resources you have access to so you need to login to your account. Simply run
 #+begin_src bash
 az login
 #+end_src
 
-This will open a web portal in your default browser where you can enter your credentials. However, if you are managing multiple Azure accounts your browser might default to another login. In that case, you can use
+This will open a web portal in your default browser where you can enter your credentials. However, if you are managing multiple Azure accounts your browser might default to another login, which can be a bit annoying. In that case, you can use
 
 #+begin_src bash
 az login --use-device-code
 #+end_src
-This will give you a code and a URL you can enter in any browser. Open up a private tab in your browser and paste the URL and then enter the code.
+This will give you a code and a URL you can enter in any browser. Open up a new private tab in your browser and paste the URL and then enter the code.
 
 * Installing the Azure ML Extension
-Install the latest version of the Azure ML extension (if you used the conda environment this should have been installed automatically when you installed azureml-sdk)
+Install the latest version of the Azure ML extension (if you used the conda environment this should have been installed automatically when you installed the azureml-sdk). Otherwise, run this to install the extension
 #+begin_src bash
 az extension add --name ml
 #+end_src
 
-* Creating an Azure ML Workspace
-There are three ways to create an Azure ML workspace, Azure Portal, CLI, or SDK. I would recommend that you use the Portal for this since it will show you all the options you can choose.
-
-Go to the Azure Portal, search work machine learning, and select Azure ML. Click on create a workspace, and give your workspace a suitable name. Otherwise, use the defaults.
-
-Note: One of the options at the bottom asks you if you want to set up a Container Registry for the workspace. Leave that *unchecked* for now. Container Registries consume a surprising amount of credits, even when inactive. This Container Registry is needed when we build Environments later for Azure ML, but Azure ML will automatically create one for you when you need it, so there is no need to create one at the start. The only reason to check it is if you already have an existing Container Registry you want your workspace to use.
-
-If you are interested, go into the Azure ML Studio and look around. See what each tab in the side menu contains. If you have watched the introduction to Azure ML presentation most of this should be familiar to you.
-
 * Setting CLI Defaults
-Almost all commands in AML CLI require a workspace. A workspace can be uniquely identified using your subscription, resource group, and workspace name. To not have to enter this information for all the commands we call, we can set them as defaults in the Azure CLI.
+Almost all commands in the Azure ML CLI require a reference to your workspace. Your workspace is uniquely defined by your subscription, resource group name, and workspace name. We can set default values for these flags in the Azure CLI, so we don't have to retype them every time.
 
 Set the default subscription
 #+begin_src bash
@@ -61,11 +80,14 @@ az account set -s <subscriptionId>
 
 Similarly, you can set the default resource group and default workspace name
 #+begin_src bash
-az configure -–defaults group='<resource-group-name>'
+az configure --defaults group='<resource-group-name>'
 az configure --defaults workspace='<workspace-name>'
 #+end_src
+(some people have reported that this two snippets above give error when copied directly from GitHub. The fix seems to be to retype the dashes before default, I don't know why)
 
-Check that you can run this command without any errors. Should output an empty list since you don't have any models yet.
+The defaults are set in a file called config in the ~$HOME/.azure~ directory. If you already have some default you want to preserve here, e.g., for a customer project, you can save this file somewhere before changing the defaults.
+
+Check that you can run this command without producing any errors. This should output an empty list since you don't have any models yet.
 #+begin_src bash
 az ml model list
 #+end_src
