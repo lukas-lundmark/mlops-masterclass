@@ -412,16 +412,57 @@ service = Model.deploy(
     inference_config=inference_config,
     deployment_config=deployment_config,
     overwrite=True,
-    deployment_target=aks_target
+    deployment_target=aks_target # <- Added compute target
 )
 service.wait_for_deployment(show_output=True)
 print('uri', service.scoring_uri)
-print('key', service.get_keys()[0]) # Your service is per default protected by key authentication
+print('key', service.get_keys()[0]) # Your service is per default protected by key authentication.
 #+end_src
 
-Running this script can take up to 10 minutes, with most of the time being spent setting up the compute cluster. However, since we didn't change the scoring or environment, that build should be almost instant.
+Running this script can take up to 10 minutes, with most of the time being spent setting up the compute cluster. However, since we didn't change the scoring or environment, we will not have to rebuild the service container, so the actual deployment should be instantanious.
 
-Use the uri and key to send some test requests to your new service. If you lost them you can always see them in the studio. Test that your service works using our neat testing script
+Use the uri and key to send some test requests to your new service. If you lose them you can always view them in the studio.
+
+Test that your service works using our neat testing script.
+
+** If you are using Solita Sandbox
+The Solita Sandbox will not allow you to create an Azure Kubernetes Cluster Instance using the AML SDK. This is due to Solita's tagging policy for certain resources - which you saw when you created your resource group. Unfortunently, Kubernetes clusters require these tags, and the SDK provides no a way to set tags. Fortunently, we can instead use Azure Container Instances to manage the service and deploy directly to AML compute clusters. Currently (june 2022), these resources do not seem to be covered by Solitas tagging policy due to being managed internally by AML, and even if they were, the SDK allows you to provide the necessary tags on creation.
+
+The process of allocating an AciCluster is similar to creating an AKSCluster
+
+#+begin_src python
+from azureml.core.compute import ComputeTarget, AmlCompute
+from azureml.core.compute_target import ComputeTargetException
+
+cpu_cluster_name="myacicompute"
+try:
+    aci_target = ComputeTarget(workspace=workspace, name=cpu_cluster_name)
+except ComputeTargetException:
+    compute_config = AmlCompute.provisioning_configuration(
+        vm_size="STANDARD_D1",
+        max_nodes=1,
+        idle_seconds_before_scaledown=300,
+        tags={"Owner": "firstname.lastname@solita.fi", "DueDate": "01-07-2022"},
+    )
+    aci_target = ComputeTarget.create(ws, cpu_cluster_name, compute_config)
+    aci_target.wait_for_completion(show_output = True)
+#+end_src
+
+In your orchestration script for the Webservice, create a Aci deployment configuration and set the compute target to your Aci cluster.
+#+begin_src python
+ from azureml.core.webservice import AciWebservice
+ deployment_config = AciWebservice.deploy_configuration(cpu_cores=1, memory_gb=1)
+
+service = Model.deploy(
+    #...
+    deployment_config=deployment_config,
+    # ...
+    compute_target=aci_target
+ )
+#+end_src
+
+For this workshop/masterclass there shouldn't be any major difference between using Kubernetes and ACI, but when you start to cover more advanced topics, there are some practical differences in how resources are scaled and used by the two different services. (An earlier version of this workshop used Kubernetes to perform gradual deployments (blue-green deployment) which required a AKS cluster but had to be removed due to vCore quotas on free-tier accounts).
+
 
 * Final Thoughts
 So far, we have created a very basic POC and we have already deployed it as a web service running in a mock production environment. Your little project can now be considered as being MLOps Level 0. The next step is now to move towards MLOps Level 1, by making our training automated. In the step after that, we will move towards running training in GitHub.
