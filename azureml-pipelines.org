@@ -270,10 +270,7 @@ response = requests.post(
 As a final exercise, modify your pipeline_build script to add pipeline arguments that can change the name of the model. Then, modify the run_pipeline script to take the model name as an optional parameter, which it then provides as a pipeline parameter when invoking the pipeline. This might seem quite basic, but it will be useful on the next day of the workshop when we want to configure the pipeline to run certain checks given certain conditions.
 
 
-* Optional Section
-If you have come this far and still have some time left to kill, you can dive deeper into some more advanced pipeline topics
-
-** Pipeline Endpoint
+* Pipeline Endpoint
 Having to keep track of pipeline IDs quickly becomes annoying. Named Pipeline Endpoints offer a consistent endpoint that you can use to invoke your latest pipeline. You set your latest pipeline as the endpoint's default and simply call the endpoint as you would any other pipeline. You can then change the default pipeline of the endpoint whenever you build a new pipeline and still invoke it the same way.
 
 You can create/update a pipeline endpoint using a simple script, like this
@@ -315,7 +312,7 @@ status = run.wait_for_completion(show_output=True)
 print(status)
 #+end_src
 
-** More Advanced Pipelines
+* More Advanced Pipelines
 The current pipeline is embarrassingly simple, merely consisting of a single step. As our project matures, we should start to break up the training script into smaller sub-scripts, such that they can be reused in other pipelines or by other members of the project. Maybe one script to check if we have new data to train on, one script to clean the data, and so forth.
 
 If you want an example of how you can create more (read overly) complex pipelines with different steps, you can look at the ~complex_pipeline~ in the example repo. You find the script definitions [[https://github.com/lukas-lundmark/mlops-example/tree/main/src/complex_pipeline][here]], and the various orchestration scripts [[https://github.com/lukas-lundmark/mlops-example/tree/main/ml_pipelines/complex_pipeline][here]].
