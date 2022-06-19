@@ -1,9 +1,8 @@
 * Continuous Training
 if you have finished the material from the previous day you should have a working pipeline available behind a pipeline endpoint. Our goal now is to create a workflow in GitHub that can trigger this pipeline based on certain events, such as changes in the data, and eventually, changes in the code.
 
-Since our system will be updated based on changes in both code, data, and other triggers, it is a good idea to let the repository and its CI/CD system drive those changes. It is entirely possible to run pipelines like this using e.g., Azure Data Factory, but this code-driven approach is, in my opinion, easier to manage.
+A good MLOps system should be updated based on changes in both code and data, which is why it is easier to manage them from a CI/CD pipeline, rather than from e.g. Azure Data Factory, where a data driven workflow might have been easier.
 
-The goal is now fairly simple. We want to invoke our training pipeline.
 
 ** When should we do automatic retraining?
 If we haven't made any changes to the code, what could the benefit of running the training pipeline be? Retraining should be done when we have some new data, this can either be because we have gathered some new data, and we want to see if the new data can help improve results.
@@ -20,6 +19,17 @@ There are a few options for doing this (although I don't think that Azure ML pro
 We can either decide to let a model be evaluated on a new dataset pass by default, this is the easiest but maybe not the most optimal way, since the new model might not improve results at all. Another is to re-evaluate the old model first on the new dataset and see if the new model improves results compared to that
 
 
+* Events that trigger GitHub workflows
+** repository_dispatch
+Repository dispatch is a way to send certain events to GitHub Actions.
+
+** workflow_dispatch
+Workflow dispatches are a way of manually triggering Workflow.
+
+** cron jobs
+Cron Jobs (Cron is short for Cronos, the Greek God of time. It's an old Unix term for jobs that run on a fixed schedule.) Run a workflow on a schedule
+
+
 * What to do?
 Add a guard that prevents the AML pipeline from running if no new data is registered. The easiest way to do this is with a script, so that is my recommendation. But you can also create another pipeline step for that, you can see an example.
 
@@ -29,12 +39,157 @@ In a real setting, we would have an automatic script that uploads the data, and 
 We will update the training dataset with some new data, and see if this improves performance. In google drive, there are a few more records that we haven't used so far. We will create a new extended dataset containing this data, and then trigger retraining of our model.
 
 
-* Events that trigger workflows
-** repository_dispatch
-Repository dispatch is a way to
 
-** workflow_dispatch
+* What to do
+We will create a new workflow containing a single job which will:
+1. Check if we need to run a retraining
+2. Rerun the experiment
+3. Check the status of the run
+4. Optionally trigger other pipelines if we registered a new model
 
+Start by creting a file named continuous-training.yaml in the .workflows directory. Fill it out with the basics for running a manually invoked job, like this
 
-** Cron Jobs
-Cron Jobs (Cron is short for Cronos, the Greek God of time. It's an old Unix term for jobs that run on a fixed schedule.) One option is to have a cron job defined that will try to rerun the pipeline every day and cancel if there is no change to the training data.
+#+begin_src yaml
+name: continuous-training
+on: workflow_dispatch
+
+env:
+  RESOURCE_GROUP: <you-rg>
+  WORKSPACE: <your-workspace>
+
+jobs:
+  run_train_endpoint:
+    name: run_train_endpoint
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/<your-account-name>/<your-azureml-image>:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.CR_PAT }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v2
+
+      - name: AML Login
+        uses: ./.github/actions/aml_login
+        with:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+          RESOURCE_GROUP: ${{ env.RESOURCE_GROUP }}
+          WORKSPACE: ${{ env.WORKSPACE }}
+
+      # - name: Check for new data
+
+#+end_src
+
+The next step is to check if we need to run the pipeline, i.e., if there are any new data for us to use.
+
+** Check for new data
+The first step is to check if we need to rerun the training procedure. There is not point in rerunning a training step if we are using the same data and the same code, so we start by checking if new data has been added.
+
+An confused reader might wonder why we don't simply let Azure ML trigger the pipeline automatically when we add new data, and the simple answer is that this basic functionality is missing for some reason. It would be optimal if we could use Azure ML to send an event when a new dataset is added, but currently no such events exists. Therefore, we instead have to either trigger our GitHub Workflows manually, or use a cron job to check if new data has been added and then start the pipeline.
+
+The SDK provides a simple way to check is if we have a new version of the dataset registered later than the last successful model.
+
+#+begin_src python
+# Download the latest version of our model
+from azureml.core import Run, Model, Dataset
+from datetime import datetime
+import pytz
+from ml_pipelines.utils import EnvironmentVariables
+
+env_vars = EnvironmentVariables()
+
+# Get the latest version of the model
+try:
+    model = Model(workspace, name=env_vars.model_name)
+    last_train_time = model.created_time
+except Exception:
+    # This means we don't have a model registered yet
+    last_train_time = datetime.min.replace(tzinfo=pytz.UTC)
+
+# Get the latest version of our dataset and see where it was registed
+train_ds = Dataset.get_by_name(workspace, env_vars.train_ds)
+assert train_ds is not None
+dataset_changed_time = train_ds.data_changed_time
+if dataset_changed_time > last_train_time:
+    # We have a new dataset
+    exit(0)
+else:
+    # We have an old dataset so fail
+    exit(1)
+#+end_src
+
+Create a script containing this in your ml_pipeline directory and invoke it in the next step in your new job. This script will fail if there is no new data available
+
+#+begin_src yaml
+steps:
+  # ...
+  - name: Check new data
+    run: |
+      set -e # This causes the step to fail if a command fails
+      python -m ml_pipelines.check_new_data # Invoke your script
+#+end_src
+
+** Run the pipeline endpoint
+You should already have a script from before that can be used to invoke the latest pipeline behind the pipeline endpoint. Create a second step that invokes the pipeline endpoint
+
+** Check if a new model was updated
+There are a variety of ways to check if a new model was created or not. A common method used in AML is to simply cancel the pipeline run if we fail to register a model.
+
+In the pipeline step that registers models, you can call src_python{
+run.parent.cancel()} to stop the current run.
+
+You can access the status of a pipeline after it has completed status return value from wait_for_completion.
+#+begin_src python
+Write the status of the run to an output-file
+status = run.wait_for_completion(show_output=True)
+print(status)
+#+end_src
+
+The status can have three values:
+1. Finished
+   Pipeline run until completion without falls
+2. Cancelled
+   Pipeline run was cancelled (either manually or by a call to src_python{run.cancel}
+3. Failed
+   Pipeline run failed because error in the pipeline code
+
+A good idea is to set the status of the pipeline run as the output of the step. You can then use that
+
+Add an argument to argparse called output that will be the name to which you write the status. Then, write the status to that file.
+
+#+begin_src python
+# ...
+parser.add_argument(
+    "--output", default=None, help="Write Run Status to this file."
+)
+
+#...
+
+status = run.wait_for_completion(show_output=True)
+if arguments.output is not None:
+    Path(arguments.output).write_text(status)
+#+end_src
+
+Then, you can set its contents as the output of the step
+#+begin_src yaml
+- name: Run pipeline
+  id: run-pipeline
+  run: |
+    python -m ml_pipelines.run_pipeline --output status.out
+    echo ::set-output name=status::$(cat status.out)
+#+end_src
+
+Then, you can use that results to determine which other steps to run. For example, when we are finished with training a new model, we want to dispatch an event to tell another workflow to dispatch that model. We can do that using this community action. We can then condition this step to only run if the pipeline ran until completion.
+#+begin_src yaml
+- name: Dispatch
+  uses: peter-evans/repository-dispatch@v1
+  if: steps.run-pipeline.outputs.status == 'Finished'
+  with:
+    token: ${{ secrets.CR_PAT }}
+    event-type: model-trained-event
+#+end_src
+
+In the next section, we will use this event to trigger the automatic deployment of the webservice we created earlier.

@@ -1,51 +1,138 @@
 * Continuous Deployment (of Models)
 In this section, we will start to look at how we can perform automatic deployment of new models, or automatically deploy new versions of our service.
 
-** Smoke Test
-To not deploy something that is broken, it is a good idea to do some very basic smoke test (a smoke test is a basic test to check that basic functionality works).
+In the previous day, we already
 
-In our case, a smoke test should create a temporary web service, see if it can respond to requests, and also, check if the responses have a sufficiently high performance.
+* What should triggere a redeploy
+A new version of the service should be deployed either if a new version of the service, i.e., the source code for the service has changed, or if we have a new, better model to deploy.
+
+* What to do
+Our goal is to automatically deploy a new and working version of our models given a new models or if the source code for the web service changes.
+1. C
+2. Build the new webservice
+3. Run a smoke test to see if the new webservice works and that the new model performs good enough
+4. Deploy the new service and phase out the old one
+
+
+* Workflow triggers
+Remember the event we triggered in the other workflow. We will use that to trigger the creation of new models. We will also make the workflow trigger on updates to the web service code, and also use a manual trigger (workflow_dispatch) for good measure
+
+#+begin_src yaml
+name: Deploy Model
+
+env:
+  RESOURCE_GROUP: <my-rg>
+  WORKSPACE: <my-ws>
+
+# Run this workflow if we have a trained model or if we
+on:
+  repository_dispatch:
+    types: [model-trained-event]
+  push:
+    branches: [main]
+    paths:
+      - 'ml_pipelines/deployment/**'
+      - 'src/deployment/**'
+  workflow_dispatch:
+#+end_src
+
+** Smoke Test
+In order to perform the smoke test we need the following steps:
+1. A way to deploy the model - we already created such a script in the previous day
+
+To not deploy something that is broken, it is a good idea to check that the deployment can handle basic functionality - this is often called a smoke test.
+
+In our case, the smoke test will create a temporary web service, see if it can respond to some basic requests, and also, check if the responses have a sufficiently high performance.
 
 Checking the performance is important because while the service might work, there can be some issues with the data preprocessing that causes the model to spew out gibberish. So it's best to catch such problems early on.
 
+** Implementing the smoke test
+Create a separate job for the smoke test that will run before the deployment update. We will configure the environment variables here locally, since this allows us to run the same code as always but creating different resources for testing - in this case .
+ Here we can reuse our previous orchestration script for creating deployment but with some new values for environment variables so we use a new AKS cluster and a unique service name. (Just make sure that your EnvironmentVariable class actually reads these results)
 
-*** Implementing the smoke test
-Create a separate job for the smoke test that will run before the deployment update. Here we can reuse our previous orchestration script for creating deployment but with some new values for environment variables so we use a new AKS cluster and a unique service name.
 #+begin_src yaml
-- smoke-test
-  name: Test if new service works
-  env:
-    CLUSTER_NAME: smoke_test_cluster
-    SERVICE_NAME: service-name
-#+end_src
+jobs:
+  - smoke-test
+    name: Run
+    runs-on: ubuntu-latest
 
-There is a small utility script that can send requests to the service and evaluate the responses. Use that to test the service. If it works, we can destroy this service, and continue and update the old service.
+    # .. Container Configuration
+    # ... necessary AML initialization steps
+#+end_src
+(Don't forget to add the necessary boilerplate steps.)
+
+
+** Building a mock service
+Add the environemnt variables at the job which
+#+begin_src yaml
+jobs:
+  - smoke-test
+    name: Run
+    runs-on: ubuntu-latest
+
+    env:
+      INFERENCE_CLUSTER_NAME: "test-cluster"
+      SERVICE_NAME: "test-service"
+    # .. Container Configuration
+    # ... necessary AML initialization steps
+
+Since we have configured the environment to use a special service we can use the same script as we used the previous day, and it will automatically create a new compute resources and new service.
+
+Create a new step that builds a new webservice.
+
+** Running Smoke Test
+There is a very basic smoke [[https://github.com/lukas-lundmark/mlops-example/blob/main/ml_pipelines/deploy/smoke_test.py][test script]] you can use to test that your mock service is running correctly. It downloads the URI and key of the service your created, and it downloads the latest test dataset and sends the entire dataset in batches to the new service. It then checks the result in order to assure that the model not only works, but that the result can be parsed and that there hasn't been any regression in how the model performs.
+
+Create a new step that runs this smoke test script.
 
 *** Testing your test
-Just for fun, see if you can prevent a bad service from being deployed.
+Just for fun, see if you can prevent a bad service from passing your check.
 First, break your service completely by adding an exit() call in the init method. Commit and see what happens.
 
-Then, remove the exit call and add some large noise to the responses instead.
+Then, remove the exit call and add some large noise to the responses in the smoke test instead.
 
 Commit the changes and see what happens.
 
-***
+** Deleting the smoke test
+You can use the script we created previously to tear down the service and compute target after we run the test (although I suggest you disable the tear down of the compute target in the beginning since it takes so long to create and recreate).
+
+Again, you simply create a new step in your smoke test job. However, we also  want to tear down the mock service even if the smoke-test fails. We can configure a subsequent step to run even if the previous failed by setting the if statement (success() is the default).
+
+#+begin_src yaml
+- name: "Destroy Test Model"
+  if: success() || failure()
+  run: python -m ml_pipelines.deploy.delete_service
+#+end_src
+
+* Deploying the validated service
+So we have checked that our models works (at least to some extent).
+
+Now we can create a new job that depends on the smoke test to complete. This requires the same boiler plate as the same job (the major downside of using GitHub Actions), and a single new steo
+
+#+begin_src yaml
+jobs:
+  #
+  deploy-model:
+    name: Create or Update Deployment
+    runs-on: ubuntu-latest
+    needs: smoke-test
+#+end_src
 
 ** Updating the Webservice
-Updating the web service is quite easy to do. If you use the same deploy_service script as before, the latest version of the model should already be downloaded by default. You just set src_python{overwrite=True} in the src_python{Model.deploy} call to overwrite the existing service, which should also be done already.
+Add a new step that deploys the model. It should just require a single call to the same build script we have already used. After that we are done.
 
-It might be a good idea to add some tags to the service, such that we later can check which commit and workflow run created it.
+However, tt might be a good idea to add some tags to the service, so we can check later which commit and workflow run created it.
 
-After you have updated the service, add some new tags to it
+You can add this at the end of the deployment script.
 #+begin_src python
 service.add_tags({'GITHUB_SHA': os.getenv("GITHUB_SHA"), "BUILD_ID": os.getenv("GITHUB_WORKFLOW")})
 #+end_src
 
-Trigger the entire pipeline again using the repo dispatch event or workflow dispatch event. See that all the smoke tests are cleared and that the new service is created. Check in the studio that the new services tags match the commit hash of the latest commit.
+Trigger the entire pipeline again using the manual workflow dispatch event. See that all the smoke tests are cleared and that the new service is created. Check in the studio that the new services tags match the commit hash of the latest commit.
 
-*** Smoother Updates
-In this case, we just update the service, but this is not recommended in a more realistic scenario. Azure ML offers a service called Online Endpoints which uses Kubernetes Endpoints to manage multiple deployments simultaneously. This allows us to have multiple versions of the service running, which allows us to gradually incorporate the new version.
+* Final Notes: Smoother Updates
+In this case, we just overwrite the existing service, but this is not recommended in a more realistic scenario. Azure ML does provide a service called Online Endpoints which uses Kubernetes Endpoints to manage multiple deployments simultaneously. This allows us to have multiple versions of the service running, which in turn allows us to gradually incorporate and pahse out new and old version.
 
-This method is called Blue-Green Deployment and is quite common when deploying web services using CI/CD.
+This method of deployment is called Blue-Green Deployment and is quite common when deploying web services using CI/CD.
 
-It would be nice to incorporate this in future versions of the master class, but this is a bit difficult due to quota limitations on standard Azure accounts and restrictions in creating AKS clusters in the sandbox.
+It would be nice to incorporate this in future versions of the master class, but this is a bit difficult due to vCore quotas on standard Azure accounts and restrictions in creating AKS clusters in the sandbox.

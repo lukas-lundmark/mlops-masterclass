@@ -1,18 +1,83 @@
-* Continuous Integration (of Pipelines)
-The final step before we have reached MLOps level 2 is to create continuous integration of pipelines.
+* Continuous Integration and Deployment (of Pipelines)
+The final step before our system have started to approach MLOps level 2 to incorporate continuous integration and deployment for our ML pipelines.
 
-What scenarios exist where we want to update the pipeline. Well, our data scientist might have found a better way to represent certain features or is using a new machine-learning algorithm that improves performance. We want such features to be incorporated into the pipeline as quickly as possible.
+** Why?
+What scenarios exist where we want to update the pipeline? Well, our data scientist might have found a better way to represent certain features or is using a new machine-learning algorithm that improves performance. We want such features to be incorporated into the pipeline as quickly as possible.
 
 ** Testing pipelines
-The most obvious test of a pipeline is to see if it can produce a new model that improves the result of the model.
+We already know that machine learning differs from traditional software. So how should we go about testing new pipelines. There is no correct answer to this. The bare minimum is that the pipeline should be able to run until completion, and that it should perform better than previous pipelines.
+
+The most obvious test of a pipeline is to see if it can produce a new model that improves previous results.
 
 The most simple test is to check if the pipeline can run until completion and if it improves the result compared to earlier pipelines.
 
 This is also where pipeline endpoints become useful. We can create new pipelines based on new changes to the code, if that pipeline improves the result of our model, we can set that pipeline as the default in our endpoint. And then this pipeline will be triggered in all future continuous training calls. And if a pipeline doesn't improve results, we just disable it and forget about it.
 
 ** Branches and Experiments
-There are a variety of different ways you can work with branches in an MLOps project. Since MLOps is heavily inspired by DevOps and CI/CD, it becomes quite natural to use so-called trunk-based development.
+There are a variety of different ways you can work with branches in an MLOps project. Since MLOps is heavily inspired by DevOps and CI/CD, it is often bnatural to use so-called trunk-based development.
 
-The idea is just to have everyone commit either directly to the main branch, or use short-lived branches. Pull requests are used sparingly for branches that have not been merged lately. This is to prompt someone to review the code first. Otherwise, the principle is to trust developers and the CI/CD tools to catch and fix errors quickly, and only valid code should result in the deployment being updated.
+The idea is just to have everyone commit either directly to the main branch, or use very short-lived feature branches. Pull requests are used sparingly for branches that have not been merged lately. This is to prompt someone to review the code first. Otherwise, the principle is to trust developers and the CI/CD tools to catch and fix errors quickly, and only valid code should result in the deployment being updated.
 
 This makes it easy to satisfy the “everyone on the development team commits to trunk at least every 24 hours” requirement of continuous integration, and lays the foundation for the codebase to be releasable at any time, as is necessary for continuous delivery and continuous deployment.
+
+
+* What you need to do
+The pipeline requires a few step:
+1. Build new pipeline from the code.
+2. nvoke the new pipeline, see if the new pipeline run until completion.
+3. Check if a new model was registered or if results improved compared to previous runs.
+4. Set the new pipeline as the default
+5. Optionally, invoke a web service deployment
+
+* Build a new pipeline
+First, we need a way of building the pipline and saving the pipeline id, such that we can invoke it later on if the build succeeds. We already created an orchestration script for building pipelines in the previous day, so we can modify that to write out the id of the pipeline it creates.
+
+#+begin_src yaml
+- name: build pipeline
+  id: build-pipeline
+  run: |
+    python -m ml_pipelines.build_pipeline --output output.txt
+    echo ::set-output name=pipelineid::$(cat output.txt)
+#+end_src
+
+* Invoke the new pipeline
+#+begin_src yaml
+- name: invoke pipeline
+  id: invoke-pipeline
+  run: |
+    PIPELINEID="${{ steps.build-pipeline.outputs.newpipelineid }}"
+    python -m ml_pipelines.run_pipeline --id $PIPELINEID --output output.txt
+    echo ::set-output name=status::$(cat output.txt)
+#+end_src
+
+* On failure
+#+begin_src yaml
+- name: Disable Failed Pipeline
+  if: steps.run-pipeline.outputs.status != 'Finished'
+  run: |
+    PIPELINEID="${{ steps.build-pipeline.outputs.newpipelineid }}"
+    python -m ml_pipelines.disable_pipeline --id $PIPELINEID
+    echo "Disabled subpar pipeline"
+#+end_src
+
+
+* On success
+#+begin_src yaml
+- name: Set Pipeline Endpoint
+  if: steps.run-pipeline.outputs.status == 'Finished'
+  run: |
+    PIPELINEID="${{ steps.build-pipeline.outputs.newpipelineid }}"
+    python -m ml_pipelines.set_endpoint --id $PIPELINEID
+    echo "Updated superior pipeline"
+
+#+end_src
+
+Optionally, you can also also use repository dispatch to trigger a rebuild of the webservice, as we did with the continuous training pipeline
+#+begin_src yaml
+- name: Dispatch
+  uses: peter-evans/repository-dispatch@v1
+  if: steps.start-pipeline.outputs.status == 'Finished'
+  with:
+    token: ${{ secrets.CR_PAT }}
+    event-type: model-trained-event
+#+end_src

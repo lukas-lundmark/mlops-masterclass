@@ -463,6 +463,31 @@ service = Model.deploy(
 
 For this workshop/masterclass there shouldn't be any major difference between using Kubernetes and ACI, but when you start to cover more advanced topics, there are some practical differences in how resources are scaled and used by the two different services. (An earlier version of this workshop used Kubernetes to perform gradual deployments (blue-green deployment) which required a AKS cluster but had to be removed due to vCore quotas on free-tier accounts).
 
+** Deleting your Webservice
+It's always good to have a way of quickly tearing down your resources. This simple script allows you to delete your webservice.
+
+#+begin_src python
+from azureml.core import Workspace
+from ml_pipelines.utils import EnvironmentVariables
+from azureml.core.webservice import AksWebservice # or AciWebservice
+
+workspace = Workspace.from_config()
+env_vars = EnvironmentVariables()
+web_services = AksWebservice(workspace, name=env_vars.service_name)
+# web_services = AciWebservice(workspace, name=env_vars.service_name)
+web_services.delete()
+#+end_src
+
+Optionally, you may also add a way to tear down the compute target
+
+#+begin_src python
+from azureml.core.compute import ComputeTarget
+# ...
+compute_target = ComputeTarget(workspace=workspace, name=env_vars.inference_cluster_name)
+compute_target.delete(wait_for_completion=False, show_output=False)
+#+end_src
+
+Add an orchestration script called ~delete_service.py~ (it will become useful in the next day)
 
 * Final Thoughts
 So far, we have created a very basic POC and we have already deployed it as a web service running in a mock production environment. Your little project can now be considered as being MLOps Level 0. The next step is now to move towards MLOps Level 1, by making our training automated. In the step after that, we will move towards running training in GitHub.

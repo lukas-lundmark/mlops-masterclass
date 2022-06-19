@@ -102,9 +102,6 @@ jobs:
 
 Add this job and see if your container builds and that you get a new package in your account.
 
-
-
-
 *** Improvements
 There is no need to rebuild the image every time we commit to main. Instead, we should only rebuid if something related to the environment_setup directory changes.
 
@@ -144,7 +141,7 @@ az account set -s your-subscription-id
 az ad sp create-for-rbac --sdk-auth --name a-cool-name-for-the-sp --role contributor --scopes /subscriptions/<your-subscription-id>/resourceGroups/<resource-group-of-your-workspace>
 #+end_src
 
-This will output a json string in the terminal which defines the Service Principle. Copy this json string and save it somewhere that you don't lose it. Create a new secret in your repostiotory called *AZURE_CREDENTIALS* and paste the entire json string into it. We will use it in just a few steps.
+This will output a json string in the terminal which defines the Service Principle. Copy this json string and save it somewhere that you don't lose it. Create a new secret in your repo called *AZURE_CREDENTIALS* and paste the entire json string into it. We will use it in just a few steps.
 
 Now, the environment we built already contains both Azure CLI and the Azure ML Extension. So what we need is a way to run in our docker image and log in using the Service Principle we created in our jobs.
 
@@ -167,7 +164,9 @@ container:
     username: ${{ github.actor }}
     password: ${{ secrets.CR_PAT }}
 #+end_src
-Unfortunately, GitHub Action doesn't allow you to do dynamic reference to docker image you want to use. So we need to hard-code it for now. The combination of the runs-on and the container field means that the job will run on a Ubuntu Runner using our container.
+Unfortunately, GitHub Action doesn't allow you to do dynamic reference to docker image you want to use. So we need to hard-code them for now.
+
+The combination of the runs-on and the container field means that the job will run on a Ubuntu Runner using our container.
 
 You can then login to Azure using the following Action using the service principle definition we created before secret
 #+begin_src yaml
