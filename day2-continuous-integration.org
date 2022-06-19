@@ -13,15 +13,7 @@ The most simple test is to check if the pipeline can run until completion and if
 
 This is also where pipeline endpoints become useful. We can create new pipelines based on new changes to the code, if that pipeline improves the result of our model, we can set that pipeline as the default in our endpoint. And then this pipeline will be triggered in all future continuous training calls. And if a pipeline doesn't improve results, we just disable it and forget about it.
 
-** Branches and Experiments
-There are a variety of different ways you can work with branches in an MLOps project. Since MLOps is heavily inspired by DevOps and CI/CD, it is often bnatural to use so-called trunk-based development.
-
-The idea is just to have everyone commit either directly to the main branch, or use very short-lived feature branches. Pull requests are used sparingly for branches that have not been merged lately. This is to prompt someone to review the code first. Otherwise, the principle is to trust developers and the CI/CD tools to catch and fix errors quickly, and only valid code should result in the deployment being updated.
-
-This makes it easy to satisfy the “everyone on the development team commits to trunk at least every 24 hours” requirement of continuous integration, and lays the foundation for the codebase to be releasable at any time, as is necessary for continuous delivery and continuous deployment.
-
-
-* What you need to do
+* What to do
 The pipeline requires a few step:
 1. Build new pipeline from the code.
 2. nvoke the new pipeline, see if the new pipeline run until completion.
@@ -41,32 +33,79 @@ First, we need a way of building the pipline and saving the pipeline id, such th
 #+end_src
 
 * Invoke the new pipeline
+The build step will contain a unique pipeline id, which we need to use to invoke this new version of the pipeline. This will require some minor change to our run_pipeline scriopt.
+
+You can update the script to take an ~id~ argument, which if given will call a specific pipeline, instead of the endpoint.
+
+Something like this:
+#+begin_src python
+parser.add_argument("--id", default=None, help="Id of published pipeline")
+
+# ...
+
+if arguments.id is not None:
+    published_pipeline = PublishedPipeline.get(ws, id=arguments.id)
+else:
+    published_pipeline = PipelineEndpoint.get(ws, name=env_vars.pipeline_endpoint_name)
+#+end_src
+
+You then create a simple step that invokes that specific pipeline. Remember to save the status of the pipeline as well, and set it as output of the step.
+
 #+begin_src yaml
 - name: invoke pipeline
   id: invoke-pipeline
   run: |
-    PIPELINEID="${{ steps.build-pipeline.outputs.newpipelineid }}"
-    python -m ml_pipelines.run_pipeline --id $PIPELINEID --output output.txt
+    PIPELINEID="${{ steps.build-pipeline.outputs.pipelineid }}"
+    python -m ml_pipelines.run_pipeline \
+    --id $PIPELINEID \
+    --output output.txt
     echo ::set-output name=status::$(cat output.txt)
 #+end_src
 
 * On failure
+If we fail, we just want to forget about the pipeline we created it. However, there isn't any way of deleting a pipeline. But, if you feel that you don't want old pipeline cluttering up your workspace, you can disable the endpoint, so it doesn't show up if you query the workspace.
+
+
+The following code disables the published pipeline
+#+begin_src python
+import argparse
+from azureml.pipeline.core import PublishedPipeline
+from azureml.core import Workspace
+from ml_pipelines.utils import EnvironmentVariables
+
+ws = Workspace.from_config()
+env_vars = EnvironmentVariables()
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--id", required=True, help="Published Pipeline to invoke")
+arguments = parser.parse_args()
+
+published_pipeline = PublishedPipeline.get(ws, id=arguments.id)
+published_pipeline.disable()
+#+end_src
+
+Then, just write a step that invokes that script
+
 #+begin_src yaml
 - name: Disable Failed Pipeline
   if: steps.run-pipeline.outputs.status != 'Finished'
   run: |
-    PIPELINEID="${{ steps.build-pipeline.outputs.newpipelineid }}"
+    PIPELINEID="${{ steps.build-pipeline.outputs.pipelineid }}"
     python -m ml_pipelines.disable_pipeline --id $PIPELINEID
     echo "Disabled subpar pipeline"
 #+end_src
 
 
 * On success
+Now, if the pipeline runs until success, i.e., we not only run the model, but we also registered a new model, we then want to do two things.
+
+First, we want to update the pipeline used by the pipeline endpoint, such that future training runs. You should have created a script in the previous part of the workshop.
+
 #+begin_src yaml
 - name: Set Pipeline Endpoint
   if: steps.run-pipeline.outputs.status == 'Finished'
   run: |
-    PIPELINEID="${{ steps.build-pipeline.outputs.newpipelineid }}"
+    PIPELINEID="${{ steps.build-pipeline.outputs.pipelineid }}"
     python -m ml_pipelines.set_endpoint --id $PIPELINEID
     echo "Updated superior pipeline"
 
@@ -81,3 +120,13 @@ Optionally, you can also also use repository dispatch to trigger a rebuild of th
     token: ${{ secrets.CR_PAT }}
     event-type: model-trained-event
 #+end_src
+
+* Branches and Experiments
+There are a variety of different ways you can work with branches in an MLOps project. Since MLOps is heavily inspired by DevOps and CI/CD, it is often bnatural to use so-called trunk-based development.
+
+The idea is just to have everyone commit either directly to the main branch, or use very short-lived feature branches. Pull requests are used sparingly for branches that have not been merged lately. This is to prompt someone to review the code first. Otherwise, the principle is to trust developers and the CI/CD tools to catch and fix errors quickly, and only valid code should result in the deployment being updated.
+
+This makes it easy to satisfy the “everyone on the development team commits to trunk at least every 24 hours” requirement of continuous integration, and lays the foundation for the codebase to be releasable at any time, as is necessary for continuous delivery and continuous deployment.
+
+* Final Notes
+** TODO
