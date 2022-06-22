@@ -324,7 +324,7 @@ To test your service there exist a basic python script ~send_request.py~ in the 
 
 This will command will send 10 example records to the deployment and print the response
 #+begin_src bash
-python send_request.py --url <target-uri>/score [--key <key>] --file data/diamonds-test.csv --n 10
+python send_request.py --url <target-uri>/score [--key <key>] --source-file data/diamonds-test.csv --n 10
 #+end_src
 
 The URL is the URI of the web service, which should be http://localhost:6789/score for the packaged service. The key flag can be ignored for now, since we are running locally. The file flag points to the test data we have downloaded and will send n records from it
