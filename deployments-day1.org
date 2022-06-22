@@ -457,7 +457,7 @@ service = Model.deploy(
     #...
     deployment_config=deployment_config,
     # ...
-    compute_target=aci_target
+    deployment_target=aci_target
  )
 #+end_src
 
